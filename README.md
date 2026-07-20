@@ -20,7 +20,7 @@ numerical outputs.
 ## How it works
 
 <p align="center">
-  <img src="assets/tracer_workflow.png"
+  <img src="assets/figure_4.png"
        alt="Multi-step autonomous diagnostic process of TRACER"
        width="100%">
 </p>
