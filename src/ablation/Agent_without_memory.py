@@ -5,14 +5,14 @@
 Agent Runner (ABLATION: NO MEMORY) — RAG + RAGAS + LLM Top-K injection
 -------------------------------------------------------------------------------
 ABLATION VARIANT: the cross-step MEMORY module is removed from this file.
-For the full pipeline (with memory), use Agent_v12.py.
+For the full pipeline (with memory), use Tracer_Agent.py.
 
 What "no memory" means here (single-variable ablation):
 - No persistent FileChatMessageHistory: nothing is stored or recalled.
 - The LangChain conversational-history placeholder is always EMPTY.
 - previous summaries are never injected (prev_summaries == [] -> "(none)").
 - Each step is analyzed INDEPENDENTLY using only [current RAG] + [current log]
-  + [current Top-K]. RAG / Top-K / RAGAS / Vision are UNCHANGED vs. Agent_v12.py.
+  + [current Top-K]. RAG / Top-K / RAGAS / Vision are UNCHANGED vs. Tracer_Agent.py.
 
 - Summarization uses: [current RAG] + [current log]  (no previous summaries)
 - Optional Chroma RAG and RAGAS-style metrics
@@ -83,7 +83,7 @@ os.environ.pop("LANGSMITH_API_KEY", None)  # avoid tracer surprises
 from langchain_openai import ChatOpenAI
 from langchain_community.chat_message_histories import FileChatMessageHistory
 # [ABLATION: NO MEMORY] non-persistent, in-memory history used as an always-empty
-# stand-in so the chain structure stays identical to Agent_v12.py while no state
+# stand-in so the chain structure stays identical to Tracer_Agent.py while no state
 # carries across steps. Import path differs across langchain versions -> fallback.
 try:
     from langchain_core.chat_history import InMemoryChatMessageHistory as _EmptyChatHistory
@@ -174,7 +174,7 @@ class MemoryManager:
     """[ABLATION: MEMORY REMOVED]
 
     Drop-in, interface-compatible replacement for the persistent
-    FileChatMessageHistory-backed memory used in Agent_v12.py. Every method is
+    FileChatMessageHistory-backed memory used in Tracer_Agent.py. Every method is
     neutralized so that NO state is stored or recalled across steps:
 
     - history():               returns a FRESH, EMPTY in-memory history each call,
@@ -185,7 +185,7 @@ class MemoryManager:
 
     Net effect: each step is analyzed independently from only the CURRENT RAG
     snippet + log + Top-K. All other components (RAG / Top-K / RAGAS / Vision)
-    and the prompt/chain are byte-identical to Agent_v12.py.
+    and the prompt/chain are byte-identical to Tracer_Agent.py.
     """
 
     def __init__(self, log_dir: str):

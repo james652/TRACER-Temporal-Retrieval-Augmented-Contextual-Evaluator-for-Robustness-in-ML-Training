@@ -5,7 +5,7 @@
 Agent Runner (Class-based, LangChain Memory + RAG + RAGAS)
 -------------------------------------------------------------------------------
 ABLATION VARIANT: LLM Top-K extraction/injection is removed from this file.
-For the full pipeline (with Top-K), use Agent_v12.py.
+For the full pipeline (with Top-K), use Tracer_Agent.py.
 
 - Per-step memory accumulation via LangChain FileChatMessageHistory
 - Summarization uses: [previous summaries] + [current RAG] + [current log]

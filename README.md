@@ -29,7 +29,7 @@ of security papers, scored with RAGAS-style metrics, and the most salient terms 
                                    attack verdict + JSON report
 ```
 
-Core components (`src/Agent_v12.py`):
+Core components (`src/Tracer_Agent.py`):
 - **`MemoryManager`** — per-session summary history via LangChain `FileChatMessageHistory`.
 - **`RAGRetriever`** — queries a ChromaDB `papers` collection, synthesizes evidence with the LLM.
 - **`Summarizer`** — builds each step summary from *previous summaries + RAG snippet + Top-K + log tail*.
@@ -44,7 +44,7 @@ Core components (`src/Agent_v12.py`):
 ```
 TRACER/
 ├── src/
-│   ├── Agent_v12.py         # main entry point (interactive CLI)
+│   ├── Tracer_Agent.py      # main entry point (interactive CLI)
 │   ├── attack_spec.py       # LOG_DIR + StepSpec + all build_*_specs() (attack pipeline definitions)
 │   ├── detection_prompt.py  # DETECTION_SYSTEM_PROMPT (LLM system prompt)
 │   └── ablation/            # ablation variants (no-memory / no-topk / no-rag / no-instruct / gpt4.1 / sweeps)
@@ -119,7 +119,7 @@ The `Analysis` paths (below) only need the step logs, so they can be run without
 
 ```bash
 cd src
-python Agent_v12.py
+python Tracer_Agent.py
 # prompt: which program?
 #   Brainwash / brainwash_cifar10 / brainwash_miniimagenet / brainwash_tinyimagenet
 #   Accumulative / accumulative_cifar100
