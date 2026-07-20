@@ -2,9 +2,7 @@
 
 **Temporal Retrieval-Augmented Contextual Evaluator for Robustness in ML Training**
 
-Official implementation of the paper *TRACER: Temporal Retrieval-Augmented Contextual Evaluator for
-Robustness in ML Training* — Junseok Shin, Jinhyeok Jang, Sohee Park, Jinwoo Lee, Daeseon Choi
-(AI Safety Center, Soongsil University). *Preprint submitted to Elsevier.*
+Official implementation of the paper **[TRACER: Temporal Retrieval-Augmented Contextual Evaluator for Robustness in ML Training](https://www.sciencedirect.com/science/article/pii/S0957417426025765)** — Junseok Shin, Jinhyeok Jang, Sohee Park, Jinwoo Lee, Daeseon Choi (AI Safety Center, Soongsil University). Published in *Expert Systems with Applications* (Elsevier).
 
 TRACER is an LLM-agent framework that **orchestrates ML data-poisoning / backdoor / adversarial
 attack pipelines, reads their execution logs, and decides *which attack occurred* (if any).**
@@ -247,10 +245,12 @@ reasoning engine (GPT-4.1 additionally evaluated).
 
 ```bibtex
 @article{shin2026tracer,
-  title   = {{TRACER}: Temporal Retrieval-Augmented Contextual Evaluator for Robustness in {ML} Training},
-  author  = {Shin, Junseok and Jang, Jinhyeok and Park, Sohee and Lee, Jinwoo and Choi, Daeseon},
-  year    = {2026},
-  note    = {Preprint submitted to Elsevier}
+  title     = {{TRACER}: Temporal Retrieval-Augmented Contextual Evaluator for Robustness in {ML} Training},
+  author    = {Shin, Junseok and Jang, Jinhyeok and Park, Sohee and Lee, Jinwoo and Choi, Daeseon},
+  journal   = {Expert Systems with Applications},
+  publisher = {Elsevier},
+  year      = {2026},
+  url       = {https://www.sciencedirect.com/science/article/pii/S0957417426025765}
 }
 ```
 
