@@ -10,53 +10,22 @@ collection = chroma_client.get_or_create_collection(name="papers")
 
 openai_client = OpenAI()
 
-# Place the downloaded PDFs in ./papers/ (see README). Filenames below must match.
+# ── RAG knowledge base: register one entry per source PDF ─────────────────────
+# Add one dict per paper you want in the "papers" collection. Copy the paper1
+# block below for each additional paper (paper2, paper3, …): set pdf_path to the
+# PDF on your machine and fill in its metadata (title / authors / year).
+# See the README for the list of papers used in the paper's knowledge base.
 papers = [
     {
         "id_prefix": "paper1",
-        "pdf_path": "./papers/Abbasi_BrainWash_A_Poisoning_Attack_to_Forget_in_Continual_Learning_CVPR_2024_paper.pdf",
+        "pdf_path": "./papers/your_paper.pdf",  # <-- put the path to your PDF here
         "metadata": {
-            "title": "BrainWash: A Poisoning Attack to Forget in Continual Learning",
-            "authors": "Ali Abbasi; Parsa Nooralinejad; Hamed Pirsiavash; Soheil Kolouri",
+            "title": "Paper title",
+            "authors": "Author One; Author Two",
             "year": 2024,
         },
     },
-    {
-        "id_prefix": "paper2",
-        "pdf_path": "./papers/NeurIPS-2021-accumulative-poisoning-attacks-on-real-time-data-Paper.pdf",
-        "metadata": {
-            "title": "Accumulative Poisoning Attacks on Real-time Data",
-            "authors": "Tianyu Pang; Xiao Yang; Yinpeng Dong; Hang Su; Jun Zhu",
-            "year": 2021,
-        },
-    },
-    {
-        "id_prefix": "paper3",
-        "pdf_path": "./papers/Enhancing Backdoor Attacks with Multi-Level MMD Regularization.pdf",
-        "metadata": {
-            "title": "Enhancing Backdoor Attacks with Multi-Level MMD Regularization",
-            "authors": "Pengfei Xia; Hongjing Niu; Ziqiang Li; Bin Li",
-            "year": 2023,
-        },
-    },
-    {
-        "id_prefix": "paper4",
-        "pdf_path": "./papers/Neural Relation Graph A Unified Framework for Identifying Label Noise and Outlier Data.pdf",
-        "metadata": {
-            "title": "Neural Relation Graph: A Unified Framework for Identifying Label Noise and Outlier Data",
-            "authors": "Jang-Hyun Kim; Sangdoo Yun; Hyun Oh Song",
-            "year": 2023,
-        },
-    },
-    {
-        "id_prefix": "paper5",
-        "pdf_path": "./papers/Rethinking_Label_Poisoning_for_GNNs_Pitfalls_and_Attacks.pdf",
-        "metadata": {
-            "title": "Rethinking Label Poisoning for GNNs: Pitfalls and Attacks",
-            "authors": "Vijay Lingam; MohammadSadegh Akhondzadeh; Aleksandar Bojchevski",
-            "year": 2024,
-        },
-    },
+    # Add more papers here, each following the paper1 template above.
 ]
 
 def delete_existing_prefix(collection, id_prefix: str, batch_size: int = 500):

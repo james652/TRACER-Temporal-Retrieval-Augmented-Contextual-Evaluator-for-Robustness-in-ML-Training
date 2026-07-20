@@ -113,10 +113,11 @@ chroma run --host 127.0.0.1 --port 8000 --path ./chroma_db
 ```
 
 ### 4. Build the RAG knowledge base
-Source papers are **not** shipped in this repo (copyright). Download the PDFs listed in
-[`rag/ingest.py`](rag/ingest.py) — BrainWash (CVPR'24), Accumulative Poisoning (NeurIPS'21),
-Multi-Level MMD Regularization, Neural Relation Graph, and Rethinking Label Poisoning for GNNs —
-place them under `./papers/`, then:
+Source papers are **not** shipped in this repo (copyright). The paper's knowledge base uses five
+security papers — BrainWash (CVPR'24), Accumulative Poisoning (NeurIPS'21), Multi-Level MMD
+Regularization, Neural Relation Graph, and Rethinking Label Poisoning for GNNs. Download their PDFs,
+place them under `./papers/`, and register each one in [`rag/ingest.py`](rag/ingest.py) (copy the
+`paper1` template block), then:
 ```bash
 python rag/ingest.py       # extracts, chunks (1000-tok / 200 overlap), embeds → "papers" collection
 python rag/chromacheck.py  # sanity check
