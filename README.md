@@ -2,16 +2,15 @@
 
 **Temporal Retrieval-Augmented Contextual Evaluator for Robustness in ML Training**
 
-Official implementation of the paper **[TRACER: Temporal Retrieval-Augmented Contextual Evaluator for Robustness in ML Training](https://www.sciencedirect.com/science/article/pii/S0957417426025765)** — Junseok Shin, Jinhyeok Jang, Sohee Park, Jinwoo Lee, Daeseon Choi (AI Safety Center, Soongsil University). Published in *Expert Systems with Applications* (Elsevier).
+Official implementation of the paper "[TRACER: Temporal Retrieval-Augmented Contextual Evaluator for Robustness in ML Training](https://www.sciencedirect.com/science/article/pii/S0957417426025765)", by Junseok Shin, Jinhyeok Jang, Sohee Park, Jinwoo Lee, and Daeseon Choi (AI Safety Center, Soongsil University). Published in *Expert Systems with Applications* (Elsevier).
 
 TRACER is an LLM-agent framework that **orchestrates ML data-poisoning / backdoor / adversarial
 attack pipelines, reads their execution logs, and decides *which attack occurred* (if any).**
 Each step is summarized with a memory-carrying LLM chain, grounded against a RAG knowledge base
 of security papers, scored with RAGAS-style metrics, and the most salient terms are extracted and
-**injected into the next step's retrieval query** (the "temporal" feedback loop). It is a
-**complement to** — not a replacement for — attack-execution / robustness tools (e.g., ART,
-Counterfit), adding temporal interpretation and evidence-grounded explanation on top of their
-numerical outputs.
+**injected into the next step's retrieval query** (the "temporal" feedback loop). It complements
+(rather than replaces) attack-execution / robustness tools such as ART and Counterfit, adding
+temporal interpretation and evidence-grounded explanation on top of their numerical outputs.
 
 ---
 
@@ -83,7 +82,7 @@ TRACER/
 │   ├── ingest.py            # build the ChromaDB "papers" collection from PDFs
 │   ├── utils.py             # PDF extract + token chunking + OpenAI embedding helpers
 │   └── chromacheck.py       # inspect the collection
-├── logs/                    # runtime output (git-ignored) — see "Outputs" below
+├── logs/                    # runtime output (git-ignored); see "Outputs" below
 ├── requirements.txt
 ├── .env.example
 └── README.md
@@ -112,7 +111,7 @@ chroma run --host 127.0.0.1 --port 8000 --path ./chroma_db
 
 ### 4. Build the RAG knowledge base
 Source papers are **not** shipped in this repo (copyright). The paper's knowledge base uses five
-security papers — BrainWash (CVPR'24), Accumulative Poisoning (NeurIPS'21), Multi-Level MMD
+security papers: BrainWash (CVPR'24), Accumulative Poisoning (NeurIPS'21), Multi-Level MMD
 Regularization, Neural Relation Graph, and Rethinking Label Poisoning for GNNs. Download their PDFs,
 place them under `./papers/`, and register each one in [`rag/ingest.py`](rag/ingest.py) (copy the
 `paper1` template block), then:
@@ -191,7 +190,7 @@ python src/ablation/ablation_compare.py
 > false negatives, so **K=5** is the default.
 >
 > `ablation_extract.py` / `ablation_compare.py` read result dirs (`./results/*`) produced by the
-> runs — adjust those paths for your setup.
+> runs; adjust those paths for your setup.
 
 ---
 
@@ -216,7 +215,7 @@ Everything is written under `LOG_DIR` (default `./logs`, set in `src/attack_spec
 Each report is scored in `[0, 1]` on **Faithfulness** (grounded in retrieved context?),
 **Answer Relevance** (addresses the diagnostic query?), and **Context Relevance** (is the retrieved
 context useful?). Interpretation (paper Section 3.2): **> 0.80** strong, **0.60–0.80** moderate,
-**< 0.60** weak grounding — complementary reliability indicators, not pass/fail correctness labels.
+**< 0.60** weak grounding. These are complementary reliability indicators, not pass/fail correctness labels.
 
 ---
 
