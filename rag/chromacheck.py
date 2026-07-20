@@ -93,43 +93,43 @@ def main():
     try:
         collection = chroma_client.get_collection(COLLECTION_NAME)
     except Exception as e:
-        print(f"\n[ERROR] 컬렉션 '{COLLECTION_NAME}' 조회 실패: {e}")
-        print("→ main.py를 먼저 실행해 papers 컬렉션을 생성/적재하세요.")
+        print(f"\n[ERROR] Failed to look up collection '{COLLECTION_NAME}': {e}")
+        print("-> Run main.py first to create/load the papers collection.")
         sys.exit(1)
 
     total = collection.count()
-    print(f"\n[OK] '{COLLECTION_NAME}' 총 chunk 수: {total}")
+    print(f"\n[OK] '{COLLECTION_NAME}' total chunk count: {total}")
     if total == 0:
-        print("→ 컬렉션은 존재하지만 비어 있습니다. main.py 적재를 다시 실행하세요.")
+        print("-> The collection exists but is empty. Re-run the main.py loading step.")
         sys.exit(1)
 
     ids = _fetch_all_ids(collection)
     pref = _prefix_count(ids)
-    print("\n[ID Prefix별 chunk 개수]")
+    print("\n[Chunk count per ID prefix]")
     for key in ["paper1", "paper2", "paper3", "paper4", "paper5"]:
         print(f"- {key}: {pref.get(key, 0)}")
     unknown = pref.get("unknown", 0)
     if unknown:
         print(f"- unknown: {unknown}")
 
-    # 논문별 샘플 chunk 직접 확인
+    # Directly inspect sample chunks per paper
     rows = _fetch_all_rows(collection)
-    print("\n[논문별 샘플 chunk 확인]")
+    print("\n[Sample chunk check per paper]")
     for key in ["paper1", "paper2", "paper3", "paper4", "paper5"]:
         picked = [r for r in rows if isinstance(r.get("id"), str) and r["id"].startswith(f"{key}_")]
         picked.sort(key=lambda r: _chunk_num(r.get("id", "")))
         print(f"\n{key}: {len(picked)} chunks")
         if not picked:
-            print("- (없음) 해당 논문이 적재되지 않았거나 id_prefix가 다릅니다.")
+            print("- (none) This paper was not loaded, or its id_prefix differs.")
             continue
         for r in picked[:2]:
             snippet = (r.get("doc") or "").replace("\n", " ")[:220]
             print(f"- {r['id']}: {snippet}...")
 
-    # 샘플 semantic 검색 (OpenAI 키가 있을 때만)
+    # Sample semantic search (only when an OpenAI key is available)
     if not (os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_APIKEY")):
-        print("\n[SKIP] OPENAI_API_KEY가 없어 semantic query 검증은 건너뜁니다.")
-        print("기본 적재 검증(count/prefix)은 완료되었습니다.")
+        print("\n[SKIP] OPENAI_API_KEY is not set, so semantic query verification is skipped.")
+        print("Basic load verification (count/prefix) is complete.")
         return
 
     try:
@@ -142,8 +142,8 @@ def main():
             include=["metadatas", "documents", "distances"],
         )
     except Exception as e:
-        print(f"\n[ERROR] semantic query 실패: {e}")
-        print("→ 임베딩 모델/차원 또는 API 키 상태를 확인하세요.")
+        print(f"\n[ERROR] semantic query failed: {e}")
+        print("-> Check the embedding model/dimension or the API key status.")
         sys.exit(1)
 
     print(f"\n[Semantic Query] '{query_text}' top-5")
@@ -153,11 +153,11 @@ def main():
     docs = results.get("documents", [[]])[0]
 
     if not ids:
-        print("검색 결과가 없습니다.")
+        print("No search results.")
         return
 
     for i, doc_id in enumerate(ids):
-        print(f"\n--- 결과 {i + 1} ---")
+        print(f"\n--- Result {i + 1} ---")
         print(f"ID: {doc_id}")
         if i < len(dists):
             print(f"distance: {dists[i]:.4f}")
@@ -166,7 +166,7 @@ def main():
         if i < len(docs) and isinstance(docs[i], str):
             print(f"chunk: {docs[i][:200].replace(chr(10), ' ')}...")
 
-    print("\n[완료] 임베딩 적재/조회 검증 완료")
+    print("\n[Done] Embedding load/lookup verification complete")
 
 
 if __name__ == "__main__":

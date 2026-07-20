@@ -61,7 +61,7 @@ from attack_spec import (
 # that the spec builders write/read step logs in the same place.
 # ------------------------------------------------------------------------------------
 import attack_spec as _attack_spec
-LOG_DIR = "/home/jun/work/soongsil/Agent/log_topk"
+LOG_DIR = "./log_topk"  # <-- set this to your desired log/output directory
 _attack_spec.LOG_DIR = LOG_DIR                              # spec builders resolve {LOG_DIR} at call time
 _attack_spec._TOPK_DIR = os.path.join(LOG_DIR, "LLM_topk")  # _load_topk_for_step reads this
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -540,10 +540,10 @@ class StepRunResult:
 class Runner:
     """Runs shell commands of StepSpec and collects local artifacts.
 
-    - stdout/stderr를 한 줄씩 읽지 않고,
-      subprocess.run(..., stdout=logf, stderr=STDOUT) 로
-      바로 로그 파일에만 기록해서 I/O 오버헤드를 줄임.
-    - timeout_sec 이 None, 0, 음수이면 타임아웃을 걸지 않음.
+    - Instead of reading stdout/stderr line by line, uses
+      subprocess.run(..., stdout=logf, stderr=STDOUT) to write directly
+      to the log file only, reducing I/O overhead.
+    - If timeout_sec is None, 0, or negative, no timeout is applied.
     """
 
     @staticmethod
@@ -552,18 +552,18 @@ class Runner:
         os.makedirs(os.path.dirname(spec.log_path) or ".", exist_ok=True)
 
         with open(spec.log_path, "w", encoding="utf-8") as logf:
-            # 헤더 기록
+            # Write header
             logf.write(f"--- RUN START: {spec.title} ---\n")
             logf.write(f"CMD: {spec.command}\n\n")
             logf.flush()
 
-            # timeout_sec 처리: 0 또는 음수는 "타임아웃 없음"
+            # Handle timeout_sec: 0 or negative means "no timeout"
             raw_timeout = getattr(spec, "timeout_sec", None)
             timeout_val: Optional[float]
             if isinstance(raw_timeout, (int, float)) and raw_timeout > 0:
                 timeout_val = float(raw_timeout)
             else:
-                timeout_val = None  # 타임아웃 비활성화
+                timeout_val = None  # timeout disabled
 
             try:
                 proc = subprocess.run(
@@ -576,16 +576,16 @@ class Runner:
                 )
                 exit_code = proc.returncode
             except subprocess.TimeoutExpired:
-                # 타임아웃 시 메시지 남기고, exit_code 를 음수로 표시
+                # On timeout, log a message and mark exit_code as negative
                 msg = f"[MONITOR] Timeout reached ({raw_timeout}s), process killed.\n"
                 print(msg, end="")
                 logf.write(msg)
                 exit_code = -9
 
-            # 푸터 기록
+            # Write footer
             logf.write(f"\n--- RUN END ({spec.title}) exit_code={exit_code} ---\n")
 
-        # 아티팩트 검색
+        # Search for artifacts
         found_artifacts: Dict[str, List[str]] = {}
         for patt in getattr(spec, "expected_artifacts", []):
             found_artifacts[patt] = sorted(glob.glob(patt, recursive=True))
@@ -625,7 +625,7 @@ def _unique_tokens(seq):
 
 def _merge_rag_request(existing: str, topk_obj: Dict[str, Any], max_len: int = 512) -> str:
     """
-    existing + (terms + phrases + query_hint)을 합쳐 dedup/trim
+    Merge existing + (terms + phrases + query_hint), then dedup/trim.
     """
     existing = (existing or "").strip()
     terms = topk_obj.get("terms") or []
@@ -644,13 +644,13 @@ def _merge_rag_request(existing: str, topk_obj: Dict[str, Any], max_len: int = 5
 
 def llm_extract_topk(openai_client: Optional[OpenAI], model: str, text: str, k: int = 10) -> Dict[str, Any]:
     """
-    로그/요약 텍스트에서 RAG 검색에 쓸 상위 K개의 용어/구를 LLM으로 추출.
-    실패 시 간단한 통계적 백업 추출을 수행.
+    Use the LLM to extract the top-K terms/phrases from the log/summary text for RAG retrieval.
+    On failure, fall back to simple statistical extraction.
     """
     out = {"terms": [], "phrases": [], "query_hint": ""}
 
     if openai_client is None:
-        # fallback: 아주 단순한 키워드 추출
+        # fallback: very simple keyword extraction
         toks = re.findall(r"[A-Za-z가-힣0-9_\-\.%]+", text.lower())
         counts: Dict[str, int] = {}
         stop = {"the","and","for","with","acc","loss","epoch","step","task","logs","avg","mean","last","after","before"}
@@ -690,7 +690,7 @@ TEXT:
         data["query_hint"] = (data.get("query_hint") or "").strip()
         return data
     except Exception:
-        # fallback 간단 추출
+        # fallback: simple extraction
         toks = re.findall(r"[A-Za-z가-힣0-9_\-\.%]+", text.lower())
         counts: Dict[str, int] = {}
         for t in toks:
@@ -869,7 +869,7 @@ def gpt_verify_step(step_log_path: str, step_title: str, model: str = "gpt-5") -
             "errors": [f"read error: {e}"],
             "warnings": [],
             "evidence": [],
-            "summary": f"로그 파일({step_log_path})을 읽지 못했습니다: {e}",
+            "summary": f"Failed to read log file ({step_log_path}): {e}",
         }
 
     prompt = f"""
@@ -899,7 +899,7 @@ log:
         data = json.loads(resp.choices[0].message.content)
     except Exception as e:
         last_lines = [ln for ln in log_text.strip().splitlines()[-10:]]
-        summary_guess = ("로그 말미:\n" + "\n".join(last_lines[:5])) if last_lines else "요약 불가(모델 응답 파싱 실패)"
+        summary_guess = ("Log tail:\n" + "\n".join(last_lines[:5])) if last_lines else "Summary unavailable (failed to parse model response)"
         data = {
             "step_executed": None,
             "errors": [f"gpt_parse_error: {e}"],
@@ -908,7 +908,7 @@ log:
             "summary": summary_guess,
         }
 
-    for k, default in [("step_executed", None), ("errors", []), ("warnings", []), ("evidence", []), ("summary", "요약 없음")]:
+    for k, default in [("step_executed", None), ("errors", []), ("warnings", []), ("evidence", []), ("summary", "No summary")]:
         data.setdefault(k, default)
     return data
 
@@ -965,17 +965,17 @@ def monitor_pipeline(
     specs: List[StepSpec],
     use_gpt: bool = True,
     gpt_model: str = "gpt-5",
-    pipeline_tag: str = "brainwash",  # 파일명 태깅
-    use_langchain_analysis: bool = True,  # Analysis와 동일 경로 사용
-    fallback_gpt_verify: bool = False,    # 필요 시 legacy 검증
+    pipeline_tag: str = "brainwash",  # filename tagging
+    use_langchain_analysis: bool = True,  # use the same path as Analysis
+    fallback_gpt_verify: bool = False,    # legacy verification if needed
 ) -> List[StepRunResult]:
     """
-    각 스텝 실행 ➜ 요약/평가(Analysis 방식) ➜ (NEW: MMD PNG vision 분석) ➜
-    LLM Top-K 추출/저장 ➜ 다음 스텝 rag_request에 Top-K 자동 주입 ➜ 스텝별 리포트 저장
+    Run each step ➜ summarize/evaluate (Analysis approach) ➜ (NEW: MMD PNG vision analysis) ➜
+    extract/save LLM Top-K ➜ auto-inject Top-K into the next step's rag_request ➜ save per-step report
     """
     out: List[StepRunResult] = []
 
-    # 공통 컨텍스트
+    # Shared context
     session_id = f"monitor_{pipeline_tag}_{time.strftime('%Y%m%d_%H%M%S')}"
     analyzer = Analyzer(LOG_DIR, model=gpt_model)
     TRUNC = int(os.getenv("LOG_TAIL", "20000"))
@@ -993,7 +993,7 @@ def monitor_pipeline(
         res = Runner.run_and_stream(spec)
         print("-" * 80)
 
-        # ---- summarize_local 호출 제거 → 인라인 출력으로 대체 ----
+        # ---- removed summarize_local call → replaced with inline output ----
         art_ok = True if not res.found_artifacts else any(len(v) > 0 for v in res.found_artifacts.values())
         verdict = "PASS" if (res.exit_code == 0 and art_ok) else "CHECK"
         artifacts_count = {k: len(v) for k, v in res.found_artifacts.items()}
@@ -1054,29 +1054,29 @@ def monitor_pipeline(
             analyzer.memory.save_summary(session_id, spec.title, summary_text)
 
             # ------------------------------------------------------------------
-            #  (NEW) MMD Visualization step이면 PNG를 GPT Vision으로 한 번 더 분석
+            #  (NEW) If this is an MMD Visualization step, additionally analyze the PNG with GPT Vision
             # ------------------------------------------------------------------
             try:
                 is_mmd_pipeline = pipeline_tag.lower() in ("mmd_backdoor", "mmd", "mmd_backdoor_cifar100")
                 is_visual_step = ("visual" in (spec.title or "").lower()) or ("viz" in (spec.title or "").lower())
 
                 if USE_VISION and is_mmd_pipeline and is_visual_step and analyzer.client is not None:
-                    # 너가 말한 고정 PNG 경로 우선 사용
+                    # Prefer the fixed PNG path
                     fixed_png = (
-                        "/home/jun/work/soongsil/backdoor/Multi-Level-MMD-Regularization/"
+                        "/path/to/Multi-Level-MMD-Regularization/"
                         "figures/cifar10_vgg11_blended_mlmmdr_0.1_all.png"
                     )
                     if os.path.exists(fixed_png):
                         png_path = fixed_png
                     else:
                         png_path = _find_latest_png(
-                            "/home/jun/work/soongsil/backdoor/Multi-Level-MMD-Regularization/figures/*.png"
+                            "/path/to/Multi-Level-MMD-Regularization/figures/*.png"
                         )
 
                     if png_path:
                         vision_obj = gpt_analyze_png(analyzer.client, gpt_model, png_path)
 
-                        # 저장
+                        # Save
                         vis_dir = os.path.join(LOG_DIR, "vision")
                         os.makedirs(vis_dir, exist_ok=True)
                         vis_path = os.path.join(vis_dir, f"vision_{session_id}_step{idx}.json")
@@ -1084,21 +1084,21 @@ def monitor_pipeline(
                             json.dump(vision_obj, f, ensure_ascii=False, indent=2)
                         print(f"[VISION] saved: {vis_path}")
 
-                        # summary에 합쳐서 “판정 근거”로 사용
+                        # Merge into summary to use as "decision evidence"
                         summary_text = (
                             summary_text
                             + "\n\n[VISION_IMAGE_ANALYSIS]\n"
                             + json.dumps(vision_obj, ensure_ascii=False, indent=2)
                         )
 
-                        # 메모리에도 저장(선택)
+                        # Also save to memory (optional)
                         analyzer.memory.save_summary(session_id, spec.title + " (vision)", json.dumps(vision_obj, ensure_ascii=False))
                     else:
                         print("[VISION] png not found, skipped")
             except Exception as e:
                 print(f"[VISION] error: {e}")
 
-            # 5) RAGAS  (vision 합쳐진 summary_text로 점수 계산)
+            # 5) RAGAS  (compute scores using the vision-merged summary_text)
             try:
                 question = (spec.rag_request or spec.analysis_prompt or f"What happened in step: {spec.title}?")[:1000]
                 context = f"rag_answer: {rag_answer}\n\nlog_text: {log_text}"
@@ -1107,21 +1107,21 @@ def monitor_pipeline(
             except Exception as e:
                 ragas_scores = {"error": f"ragas_scoring_failed: {e}"}
 
-            # 6) Attach to result  (vision 반영된 summary_text를 저장)
+            # 6) Attach to result  (store the vision-augmented summary_text)
             res.gpt_flags = g if isinstance(g, dict) else {"raw": str(g)}
             res.gpt_summary = summary_text
             res.ragas_scores = ragas_scores
 
-            # 7) 🔹 LLM Top-K 추출 + 저장 + 다음 스텝 rag_request 주입
+            # 7) 🔹 Extract + save LLM Top-K + inject into next step's rag_request
             if USE_TOPK:
                 combined_text = f"{summary_text}\n\n{log_text}"
                 topk_obj = llm_extract_topk(analyzer.client, gpt_model, combined_text, k=TOPK_K)
                 saved_path = _save_llm_topk_json(LOG_DIR, session_id, idx, spec.title, topk_obj)
                 print(f"[LLM TOP-K] saved: {saved_path}")
 
-                # 다음 스텝이 있다면 rag_request 갱신
+                # Update rag_request if there is a next step
                 if idx < len(specs):
-                    next_spec = specs[idx]  # 0-based 인덱스에서 다음
+                    next_spec = specs[idx]  # next in the 0-based index
                     base = next_spec.rag_request or ""
                     next_spec.rag_request = _merge_rag_request(base, topk_obj, max_len=512)
 
@@ -1158,12 +1158,12 @@ def monitor_pipeline(
                 except Exception as e:
                     res.ragas_scores = {"error": f"ragas_scoring_failed: {e}"}
 
-        #  Agent 분석 시간 측정 끝
+        #  End of agent analysis timing
         agent_elapsed = time.time() - agent_t0
         res.agent_time_sec = agent_elapsed
         print(f"[AGENT] time={agent_elapsed:.1f}s")
 
-        #  Step-level soongsil/Agent/ChromaDB/paperreport save
+        #  Step-level report save
         step_report = build_report([res], gpt_model=gpt_model)
 
         if isinstance(res.gpt_flags, dict):
@@ -1191,7 +1191,7 @@ def _find_latest_png(pattern: str) -> Optional[str]:
 
 def gpt_analyze_png(openai_client: Optional[OpenAI], model: str, png_path: str) -> Dict[str, Any]:
     """
-    PNG를 vision 입력으로 넣고 backdoor/clean/uncertain 판정을 JSON으로 받음.
+    Feed the PNG as vision input and get a backdoor/clean/uncertain verdict as JSON.
     """
     if openai_client is None:
         return {"ok": False, "error": "OpenAI client unavailable", "png_path": png_path}
@@ -1220,12 +1220,12 @@ def gpt_analyze_png(openai_client: Optional[OpenAI], model: str, png_path: str) 
                 {"type": "input_image", "image_url": img_url},
             ],
         }],
-        # 필요하면 temperature=0 같은 옵션 추가 가능
+        # Options such as temperature=0 can be added if needed
     )
 
-    # SDK가 output_text를 제공하면 그걸 쓰고, 아니면 raw를 문자열로 처리
+    # Use output_text if the SDK provides it, otherwise treat raw as a string
     text = getattr(resp, "output_text", None) or ""
-    # text가 JSON 문자열일 거라 가정하고 파싱
+    # Assume text is a JSON string and parse it
     try:
         obj = json.loads(text)
         return {"ok": True, "png_path": png_path, "vision": obj}
@@ -1239,7 +1239,7 @@ def pretty_print_attack_result(obj: Dict[str, Any]) -> str:
     rationale = obj.get("rationale_for_decision", "")
     rag = obj.get("supporting_evidence_from_rag", "")
 
-    # evidence 분리
+    # Split evidence
     num_ev, topk_ev = "", ""
     if "[TOPK]" in evidence:
         num_ev, topk_ev = evidence.split("[TOPK]", 1)
@@ -1266,7 +1266,7 @@ def pretty_print_attack_result(obj: Dict[str, Any]) -> str:
 # ====================================================================================
 if __name__ == "__main__":
     os.makedirs(LOG_DIR, exist_ok=True)
-    choice = input("어떤 프로그램을 실행할까요? (Brainwash / brainwash_miniimagenet/ brainwash_cifar10 / accumulative_cifar100/ brainwash_tinyimagenet / Accumulative / Test / Analysis / Analysis_Accumulative  / MMD_backdoor / MMD_backdoor_cifar100 / Detect / Rethink/ Rethink_pub) [Brainwash]: ").strip() or "Brainwash"
+    choice = input("Which program would you like to run? (Brainwash / brainwash_miniimagenet/ brainwash_cifar10 / accumulative_cifar100/ brainwash_tinyimagenet / Accumulative / Test / Analysis / Analysis_Accumulative  / MMD_backdoor / MMD_backdoor_cifar100 / Detect / Rethink/ Rethink_pub) [Brainwash]: ").strip() or "Brainwash"
 
     if choice.lower() in ("analysis", "analyze", "a"):
         specs = build_analyze_brainwash_specs()

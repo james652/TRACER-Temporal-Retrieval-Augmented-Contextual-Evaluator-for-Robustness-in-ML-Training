@@ -18,9 +18,27 @@ import json
 # ------------------------------------------------------------------------------------
 # Centralized paths
 # ------------------------------------------------------------------------------------
-LOG_DIR = "/home/jun/work/soongsil/Agent/logs"
-BASE_DIR = "/home/jun/work"  # adjust if needed
+LOG_DIR = "./logs"  # <-- set this to your desired log/output directory
+BASE_DIR = "."      # <-- set this to the base directory that holds your scripts/checkpoints
 _TOPK_DIR = os.path.join(LOG_DIR, "LLM_topk")
+
+# ------------------------------------------------------------------------------------
+# HOW TO USE THIS FILE
+# ------------------------------------------------------------------------------------
+# The build_*_specs() functions below each return a list of StepSpec objects. Every
+# StepSpec describes one step of an attack/analysis pipeline, and its `command` field is
+# the exact shell command that is executed for that step.
+#
+# All file-system paths shown inside these commands (and in expected_artifacts / vision_globs)
+# are PLACEHOLDERS written as "/path/to/...". They are NOT real paths. Before running,
+# replace every "/path/to/..." with the real path to your own attack/training scripts,
+# model checkpoints, datasets, and output directories. You may also replace an entire
+# command with your own equivalent invocation.
+#
+# Flags, dataset names, epoch counts, hyper-parameters, and CUDA_VISIBLE_DEVICES values
+# are kept intact so each command still documents how the corresponding step is meant to
+# be run. Adjust them as needed for your environment.
+# ------------------------------------------------------------------------------------
 
 
 @dataclass
@@ -84,13 +102,13 @@ def _collect_terms_from_file(obj: dict, limit: int = 20) -> str:
 
 def _load_topk_for_step(step_key: str, limit: int = 20) -> str:
     """
-    step_key 예: 'step1', 'step2', 'step3', 'step4'
-    파일명 예: analysis_20251107_153012__step1.json
+    step_key examples: 'step1', 'step2', 'step3', 'step4'
+    filename example: analysis_20251107_153012__step1.json
     """
     if not os.path.isdir(_TOPK_DIR):
         return ""
 
-    # 우선 해당 step에 매칭되는 파일만 찾아본다
+    # First, look only for files matching this step
     PAT = os.path.join(_TOPK_DIR, f"*__{step_key}.json")
     cand = glob.glob(PAT)
     chosen = _pick_latest(cand)
@@ -99,7 +117,7 @@ def _load_topk_for_step(step_key: str, limit: int = 20) -> str:
         if isinstance(obj, dict):
             return _collect_terms_from_file(obj, limit=limit)
 
-    # 없으면 전체 중 최신 하나라도 사용 (graceful fallback)
+    # Otherwise, fall back to the most recent file overall (graceful fallback)
     all_json = glob.glob(os.path.join(_TOPK_DIR, "*.json"))
     chosen = _pick_latest(all_json)
     if chosen:
@@ -126,14 +144,14 @@ def _concat_rag(base: str, addon: str) -> str:
 def build_brainwash_specs() -> List[StepSpec]:
     base = BASE_DIR
 
-    # 공통 베이스 쿼리
+    # Common base query
     base_query = (
         "brainwash continual learning poisoning ewc split_cifar100 cifar100 "
         "fisher diagonal catastrophic forgetting average accuracy BWT"
     )
 
-    # 각 단계별로 직전 스텝의 LLM_topk를 불러와 rag_request에 주입
-    # step1: 초기 학습이므로 topk 없음
+    # For each stage, load the previous step's LLM_topk and inject it into rag_request
+    # step1: initial training, so there is no prior topk
     step1_topk = ""  # no prior step
     step2_topk = _load_topk_for_step("step1")
     step3_topk = _load_topk_for_step("step2")
@@ -141,9 +159,9 @@ def build_brainwash_specs() -> List[StepSpec]:
 
     return [
         StepSpec(
-            title="단계 1/4: 초기 모델 학습 (EWC)",
+            title="Stage 1/4: Initial Model Training (EWC)",
             command=(
-                "CUDA_VISIBLE_DEVICES=1 python /home/jun/work/soongsil/Brainwash/main_baselines.py "
+                "CUDA_VISIBLE_DEVICES=1 python /path/to/Brainwash/main_baselines.py "
                 "--experiment split_cifar100 --approach ewc --lasttask 9 --tasknum 10 --nepochs 20 "
                 "--batch-size 16 --lamb 500000 --lamb_emp 100 --clip 100. --lr 0.01"
             ),
@@ -159,14 +177,14 @@ def build_brainwash_specs() -> List[StepSpec]:
             rag_request=_concat_rag(base_query, step1_topk),
         ),
         StepSpec(
-            title="단계 2/4: 수행",
+            title="Stage 2/4: Execution",
             command=(
-                "python /home/jun/work/soongsil/Brainwash/main_inv.py "
-                "--pretrained_model_add=/home/jun/work/soongsil/Brainwash/checkpoint/data_cifar100/ewc_lamb_500000.0__model_type_resnet_dataset_split_cifar100_class_num_10_bs_16_lr_0.01_n_epochs_20__model_name_ResNet_task_num_9__seed_0_emb_fact_1_im_sz_32_.pkl --save_dir=/home/jun/work/soongsil/Brainwash/inverse_file/cifar_100 "
+                "python /path/to/Brainwash/main_inv.py "
+                "--pretrained_model_add=/path/to/Brainwash/checkpoint/data_cifar100/ewc_lamb_500000.0__model_type_resnet_dataset_split_cifar100_class_num_10_bs_16_lr_0.01_n_epochs_20__model_name_ResNet_task_num_9__seed_0_emb_fact_1_im_sz_32_.pkl --save_dir=/path/to/Brainwash/inverse_file/cifar_100 "
                 "--task_lst=0,1,2,3,4,5,6,7,8 --save_every=1000 --batch_reg --init_acc --n_iters=10000"
             ),
             log_path=f"{LOG_DIR}/step2.log",
-            expected_artifacts=[f"{base}/continual-learning-baselines/test_jun/Brainwash/model_inv/**/*.npz"],
+            expected_artifacts=[f"{base}/continual-learning-baselines/test/Brainwash/model_inv/**/*.npz"],
             analysis_prompt=(
                 "Summarize training metrics, "
                 "detect any irregularities (NaNs, divergence, or instability), "
@@ -176,14 +194,14 @@ def build_brainwash_specs() -> List[StepSpec]:
             rag_request=_concat_rag(base_query, step2_topk),
         ),
         StepSpec(
-            title="단계 3/4: 적용",
+            title="Stage 3/4: Application",
             command=(
-                "CUDA_VISIBLE_DEVICES=0 python /home/jun/work/soongsil/Brainwash/main_brainwash.py "
+                "CUDA_VISIBLE_DEVICES=0 python /path/to/Brainwash/main_brainwash.py "
                 "--extra_desc=reckless_test "
-                "--pretrained_model_add=/home/jun/work/soongsil/Brainwash/checkpoint/data_cifar100/ewc_lamb_500000.0__model_type_resnet_dataset_split_cifar100_class_num_10_bs_16_lr_0.01_n_epochs_20__model_name_ResNet_task_num_9__seed_0_emb_fact_1_im_sz_32_.pkl "
+                "--pretrained_model_add=/path/to/Brainwash/checkpoint/data_cifar100/ewc_lamb_500000.0__model_type_resnet_dataset_split_cifar100_class_num_10_bs_16_lr_0.01_n_epochs_20__model_name_ResNet_task_num_9__seed_0_emb_fact_1_im_sz_32_.pkl "
                 "--mode='reckless' --target_task_for_eval=0 --delta=0.3 --seed=0 "
                 "--eval_every=10 "
-                "--distill_folder=/home/jun/work/soongsil/Brainwash/inverse_file/cifar_100 "
+                "--distill_folder=/path/to/Brainwash/inverse_file/cifar_100 "
                 "--init_acc --noise_norm=inf --cont_learner_lr=0.001 --n_epochs=101 --save_every=100 "
             ),
             log_path=f"{LOG_DIR}/step3.log",
@@ -198,12 +216,12 @@ def build_brainwash_specs() -> List[StepSpec]:
             rag_request=_concat_rag(base_query, step3_topk),
         ),
         StepSpec(
-            title="단계 4/4: 최종 평가",
+            title="Stage 4/4: Final Evaluation",
             command=(
-                "CUDA_VISIBLE_DEVICES=0 python /home/jun/work/soongsil/Brainwash/main_baselines.py "
+                "CUDA_VISIBLE_DEVICES=0 python /path/to/Brainwash/main_baselines.py "
                 "--experiment split_cifar100 --approach ewc --lasttask 9 --tasknum 10 --nepochs 20 "
                 "--batch-size 16 --lr 0.01 --clip 100. --lamb 500000 --lamb_emp 100 "
-                "--checkpoint /home/jun/work/noise_ewc_reckless_test__delta_0.3_dataset_split_cifar100_target_task_0_attacked_task_9_noise_optim_lr_0.005__n_iters_1_n_epochs_101_seed_0_mode_reckless____min_acc_target_36.pkl "
+                "--checkpoint /path/to/noise_ewc_reckless_test__delta_0.3_dataset_split_cifar100_target_task_0_attacked_task_9_noise_optim_lr_0.005__n_iters_1_n_epochs_101_seed_0_mode_reckless____min_acc_target_36.pkl "
                 "--init_acc --addnoise"
             ),
             log_path=f"{LOG_DIR}/step4.log",
@@ -224,27 +242,27 @@ def build_brainwash_specs() -> List[StepSpec]:
 def build_accumulative_specs() -> List[StepSpec]:
     base_query = "accumulative attack online training PGD Linf epsilon trigger collapse"
 
-    # 1단계: 베이스 학습
+    # Stage 1: base training
     step1_cmd = (
-        "python /home/jun/work/soongsil/PoisoningAttack/AccumulativeAttack/train_cifar.py "
-        "--outf /home/jun/work/soongsil/PoisoningAttack/AccumulativeAttack/checkpoints_base_bn"
+        "python /path/to/PoisoningAttack/AccumulativeAttack/train_cifar.py "
+        "--outf /path/to/PoisoningAttack/AccumulativeAttack/checkpoints_base_bn"
     )
 
-    # 2단계: 온라인 누적 공격 학습
+    # Stage 2: online accumulative attack training
     step2_cmd = (
-        "python /home/jun/work/soongsil/PoisoningAttack/AccumulativeAttack/online_accu_train.py "
+        "python /path/to/PoisoningAttack/AccumulativeAttack/online_accu_train.py "
         "--batch_size 100 --epoch 100 --test_batch_size 500 --log_name log_test_online.txt "
-        "--resume /home/jun/work/soongsil/PoisoningAttack/AccumulativeAttack/checkpoints_base_bn "
+        "--resume /path/to/PoisoningAttack/AccumulativeAttack/checkpoints_base_bn "
         "--use_bn --model_name cifar10_epoch40.pth "
         "--mode 'eval' --onlinemode 'train' --lr 1e-1 --momentum 0.9 "
         "--beta 1. --only_reg --threshold 0.18 --use_advtrigger"
     )
 
-    # 두 번째 스텝에 주입할 Top-K (첫 스텝 결과에서 뽑힌 것)
+    # Top-K to inject into the second step (extracted from the first step's results)
     step2_topk = _load_topk_for_step("step1")
 
     return [
-        # 1) 베이스 학습 실행
+        # 1) Run base training
         StepSpec(
             title="Accumulative 1/2: Base Train",
             command=step1_cmd,
@@ -254,10 +272,10 @@ def build_accumulative_specs() -> List[StepSpec]:
                 "Summarize online training: report accuracy/loss trends per epoch, "
                 "note when threshold is breached, and describe any progressive degradation."
             ),
-            rag_request=_concat_rag(base_query, ""),  # step1은 외부 주입 없음
+            rag_request=_concat_rag(base_query, ""),  # step1 has no external injection
         ),
 
-        # 2) 온라인 누적 공격 학습 실행
+        # 2) Run online accumulative attack training
         StepSpec(
             title="Accumulative 2/2: Online Poisoning Train",
             command=step2_cmd,
@@ -269,7 +287,7 @@ def build_accumulative_specs() -> List[StepSpec]:
                 "Finally, concisely summarize the observed behavior and key metrics. "
                 "Choose exactly one: Brainwash, Accumulative Attack, Label Flipping, or No Attack."
             ),
-            # ← 여기로 step1 Top-K 자동 주입
+            # <- step1 Top-K is auto-injected here
             rag_request=_concat_rag(base_query + " final evaluation analysis", step2_topk),
         ),
     ]
@@ -277,28 +295,28 @@ def build_accumulative_specs() -> List[StepSpec]:
 def build_accumulative_cifar100_specs() -> List[StepSpec]:
     base_query = "accumulative attack online training PGD Linf epsilon trigger collapse cifar100"
 
-    # 1단계: CIFAR-100 베이스 학습 (clean)
+    # Stage 1: CIFAR-100 base training (clean)
     step1_cmd = (
-        "python /home/jun/work/soongsil/PoisoningAttack/AccumulativeAttack/train_cifar.py "
+        "python /path/to/PoisoningAttack/AccumulativeAttack/train_cifar.py "
         "--dataset cifar100 --dataroot ./data --epochs 120"
     )
 
-    # 2단계: CIFAR-100 Accumulative 온라인 학습 + trigger
+    # Stage 2: CIFAR-100 accumulative online training + trigger
     step2_cmd = (
-        "python /home/jun/work/soongsil/PoisoningAttack/AccumulativeAttack/online_accu_train.py "
+        "python /path/to/PoisoningAttack/AccumulativeAttack/online_accu_train.py "
         "--batch_size 100 --epoch 100 --test_batch_size 500 --log_name log_test_online.txt "
-        "--resume /home/jun/work/soongsil/PoisoningAttack/AccumulativeAttack/checkpoints_base_bn_cifar100 "
+        "--resume /path/to/PoisoningAttack/AccumulativeAttack/checkpoints_base_bn_cifar100 "
         "--use_bn --model_name cifar100_epoch120.pth "
         "--mode 'eval' --onlinemode 'train' --lr 1e-1 --momentum 0.9 --poison_scale 0.3 "
         "--beta 1. --only_reg --threshold 0.46 --use_online_advtrigger "
         "--num_classes 100 --dataset cifar100 --dataroot ./data"
     )
 
-    step1_topk = ""  # 초기에는 Top-K 없음
+    step1_topk = ""  # no Top-K at the start
     step2_topk = _load_topk_for_step("cifar100_step1")
 
     return [
-        # ---------------------- 1단계: Base Train ----------------------
+        # ---------------------- Stage 1: Base Train ----------------------
         StepSpec(
             title="Accumulative CIFAR100 1/2: Base Train (clean)",
             command=step1_cmd,
@@ -315,7 +333,7 @@ def build_accumulative_cifar100_specs() -> List[StepSpec]:
             rag_request=_concat_rag(base_query, step1_topk),
         ),
 
-        # ---------------------- 2단계: Online Accumulative ----------------------
+        # ---------------------- Stage 2: Online Accumulative ----------------------
         StepSpec(
             title="Accumulative CIFAR100 2/2: Online Poisoning Train",
             command=step2_cmd,
@@ -340,10 +358,10 @@ def build_accumulative_cifar100_specs() -> List[StepSpec]:
 
 def build_analyze_brainwash_specs() -> List[StepSpec]:
     base_query = "average accuracy"
-    # 분석 전용: 여기서는 Top-k를 꼭 붙일 필요는 없지만, 원한다면 동일 방식으로 주입 가능
+    # Analysis-only: attaching Top-k is not strictly required here, but it can be injected the same way if desired
     return [
         StepSpec(
-            title="분석: 초기 모델 학습 (EWC) 로그",
+            title="Analysis: Initial Model Training (EWC) Log",
             command="",
             log_path=f"{LOG_DIR}/step1.log",
             analysis_prompt=(
@@ -356,7 +374,7 @@ def build_analyze_brainwash_specs() -> List[StepSpec]:
                                     _load_topk_for_step("step1")),
         ),
         StepSpec(
-            title="분석: 역공격 (Inversion Attack) 로그",
+            title="Analysis: Inversion Attack Log",
             command="",
             log_path=f"{LOG_DIR}/step2.log",
             analysis_prompt=(
@@ -367,7 +385,7 @@ def build_analyze_brainwash_specs() -> List[StepSpec]:
                                     _load_topk_for_step("step2")),
         ),
         StepSpec(
-            title="분석: Brainwash Reckless Mode 실행 로그",
+            title="Analysis: Brainwash Reckless Mode Execution Log",
             command="",
             log_path=f"{LOG_DIR}/step3.log",
             analysis_prompt=(
@@ -377,7 +395,7 @@ def build_analyze_brainwash_specs() -> List[StepSpec]:
                                     _load_topk_for_step("step3")),
         ),
         StepSpec(
-            title="분석: 최종 평가 로그",
+            title="Analysis: Final Evaluation Log",
             command="",
             log_path=f"{LOG_DIR}/step4.log",
             analysis_prompt=(
@@ -391,7 +409,7 @@ def build_analyze_brainwash_specs() -> List[StepSpec]:
     ]
 
 
-# mini-Imagenet용 brainwash 파이프라인
+# brainwash pipeline for mini-Imagenet
 def build_brainwash_miniimagenet_specs() -> List[StepSpec]:
     base = BASE_DIR
 
@@ -403,11 +421,11 @@ def build_brainwash_miniimagenet_specs() -> List[StepSpec]:
     step4_topk = _load_topk_for_step("mini_step3")
 
     return [
-        # ---------------------- 1단계: Train ----------------------
+        # ---------------------- Stage 1: Train ----------------------
         StepSpec(
             title="MiniImageNet steps 1/4",
             command=(
-                "CUDA_VISIBLE_DEVICES=1 python /home/jun/work/soongsil/Brainwash/main_baselines.py "
+                "CUDA_VISIBLE_DEVICES=1 python /path/to/Brainwash/main_baselines.py "
                 "--experiment split_mini_imagenet --approach ewc --lasttask 9 --tasknum 10 --nepochs 20 "
                 "--batch-size 16 --lamb 500000 --lamb_emp 100 --clip 100. --lr 0.01"
             ),
@@ -422,21 +440,21 @@ def build_brainwash_miniimagenet_specs() -> List[StepSpec]:
             rag_request=_concat_rag(base_query, step1_topk),
         ),
 
-        # ---------------------- 2단계: inversion ----------------------
+        # ---------------------- Stage 2: inversion ----------------------
         StepSpec(
             title="MiniImageNet steps 2/4",
             command=(
-                "CUDA_VISIBLE_DEVICES=1 python /home/jun/work/soongsil/Brainwash/main_inv.py "
-                "--pretrained_model_add=/home/jun/work/soongsil/Brainwash/checkpoint/data_miniImagenet/"
+                "CUDA_VISIBLE_DEVICES=1 python /path/to/Brainwash/main_inv.py "
+                "--pretrained_model_add=/path/to/Brainwash/checkpoint/data_miniImagenet/"
                 "ewc_lamb_500000.0__model_type_resnet_dataset_split_mini_imagenet_class_num_10_bs_16_lr_0.01_n_epochs_20__"
                 "model_name_ResNet_task_num_9__seed_0_emb_fact_1_im_sz_84_.pkl "
                 "--num_samples=128 "
-                "--save_dir=/home/jun/work/soongsil/Brainwash/output_mini_Imagenet_inversion "
+                "--save_dir=/path/to/Brainwash/output_mini_Imagenet_inversion "
                 "--task_lst=0,1,2,3,4,5,6,7,8 "
                 "--save_every=1000 --batch_reg --init_acc --n_iters=10000"
             ),
             log_path=f"{LOG_DIR}/mini_step2.log",
-            expected_artifacts=[f"{base}/soongsil/Brainwash/output_mini_Imagenet_inversion/**/*.npz"],
+            expected_artifacts=[f"{base}/Brainwash/output_mini_Imagenet_inversion/**/*.npz"],
             analysis_prompt=(
                 "Summarize progress during inversion on split_mini_imagenet, identify any unusual patterns or warnings, "
                 "and explain how the attack might influence the model's internal representations. "
@@ -445,17 +463,17 @@ def build_brainwash_miniimagenet_specs() -> List[StepSpec]:
             rag_request=_concat_rag(base_query, step2_topk),
         ),
 
-        # ---------------------- 3단계: Brainwash reckless mode ----------------------
+        # ---------------------- Stage 3: Brainwash reckless mode ----------------------
         StepSpec(
             title="MiniImageNet steps 3/4",
             command=(
-                "CUDA_VISIBLE_DEVICES=1 python /home/jun/work/soongsil/Brainwash/main_brainwash.py "
+                "CUDA_VISIBLE_DEVICES=1 python /path/to/Brainwash/main_brainwash.py "
                 "--extra_desc=reckless_test "
-                "--pretrained_model_add=/home/jun/work/soongsil/Brainwash/checkpoint/data_miniImagenet/"
+                "--pretrained_model_add=/path/to/Brainwash/checkpoint/data_miniImagenet/"
                 "ewc_lamb_500000.0__model_type_resnet_dataset_split_mini_imagenet_class_num_10_bs_16_lr_0.01_n_epochs_20__"
                 "model_name_ResNet_task_num_9__seed_0_emb_fact_1_im_sz_84_.pkl "
                 "--mode='reckless' --target_task_for_eval=0 --delta=0.3 --seed=0 --eval_every=10 "
-                "--distill_folder=/home/jun/work/soongsil/Brainwash/output_mini_Imagenet_inversion "
+                "--distill_folder=/path/to/Brainwash/output_mini_Imagenet_inversion "
                 "--init_acc --noise_norm=inf --cont_learner_lr=0.001 --n_epochs=51 --save_every=50"
             ),
             log_path=f"{LOG_DIR}/mini_step3.log",
@@ -470,14 +488,14 @@ def build_brainwash_miniimagenet_specs() -> List[StepSpec]:
             rag_request=_concat_rag(base_query, step3_topk),
         ),
 
-        # ---------------------- 4단계: 최종 평가 ----------------------
+        # ---------------------- Stage 4: Final Evaluation ----------------------
         StepSpec(
             title="MiniImageNet steps 4/4",
             command=(
-                "CUDA_VISIBLE_DEVICES=1 python /home/jun/work/soongsil/Brainwash/main_baselines.py "
+                "CUDA_VISIBLE_DEVICES=1 python /path/to/Brainwash/main_baselines.py "
                 "--experiment split_mini_imagenet --approach ewc --lasttask 9 --tasknum 10 --nepochs 20 "
                 "--batch-size 16 --lr 0.01 --clip 100. --lamb 500000 --lamb_emp 100 "
-                "--checkpoint /home/jun/work/soongsil/Brainwash/checkpoint_noise/mini_imagenet/"
+                "--checkpoint /path/to/Brainwash/checkpoint_noise/mini_imagenet/"
                 "noise_ewc_reckless_test__delta_0.3_dataset_split_mini_imagenet_target_task_0_attacked_task_9_"
                 "noise_optim_lr_0.005__n_iters_1_n_epochs_51_seed_0_mode_reckless____min_acc_target_46.pkl "
                 "--init_acc --addnoise"
@@ -495,25 +513,25 @@ def build_brainwash_miniimagenet_specs() -> List[StepSpec]:
         ),
     ]
 
-# tiny-Imagenet용 brainwash 파이프라인
+# brainwash pipeline for tiny-Imagenet
 def build_brainwash_tinyimagenet_specs() -> List[StepSpec]:
     base = BASE_DIR
 
-    # 공통 베이스 쿼리 (필요하면 나중에 더 추가해도 됨)
+    # Common base query (add more later if needed)
     base_query = "average accuracy tiny_imagenet"
 
-    # Top-K는 mini와 동일한 방식으로 step key만 tiny_*로 분리
-    step1_topk = ""  # 초기 학습 단계는 이전 스텝 없음
+    # Top-K works the same way as mini; only the step key is separated as tiny_*
+    step1_topk = ""  # initial training stage has no prior step
     step2_topk = _load_topk_for_step("tiny_step1")
     step3_topk = _load_topk_for_step("tiny_step2")
     step4_topk = _load_topk_for_step("tiny_step3")
 
     return [
-        # ---------------------- 1단계: Train ----------------------
+        # ---------------------- Stage 1: Train ----------------------
         StepSpec(
             title="TinyImageNet steps 1/4",
             command=(
-                "CUDA_VISIBLE_DEVICES=2 python /home/jun/work/soongsil/Brainwash/main_baselines.py "
+                "CUDA_VISIBLE_DEVICES=2 python /path/to/Brainwash/main_baselines.py "
                 "--experiment split_tiny_imagenet --approach ewc --lasttask 9 --tasknum 10 --nepochs 20 "
                 "--batch-size 16 --lamb 500000 --lamb_emp 100 --clip 100. --lr 0.01"
             ),
@@ -528,20 +546,20 @@ def build_brainwash_tinyimagenet_specs() -> List[StepSpec]:
             rag_request=_concat_rag(base_query, step1_topk),
         ),
 
-        # ---------------------- 2단계: inversion ----------------------
+        # ---------------------- Stage 2: inversion ----------------------
         StepSpec(
             title="TinyImageNet steps 2/4",
             command=(
-                "CUDA_VISIBLE_DEVICES=2 python /home/jun/work/soongsil/Brainwash/main_inv.py "
-                "--pretrained_model_add=/home/jun/work/soongsil/Brainwash/checkpoint/data_tinyImagenet/"
+                "CUDA_VISIBLE_DEVICES=2 python /path/to/Brainwash/main_inv.py "
+                "--pretrained_model_add=/path/to/Brainwash/checkpoint/data_tinyImagenet/"
                 "ewc_lamb_500000.0__model_type_resnet_dataset_split_tiny_imagenet_class_num_20_bs_16_lr_0.01_n_epochs_20__"
                 "model_name_ResNet_task_num_9__seed_0_emb_fact_9_im_sz_64_.pkl "
                 "--num_samples=128 "
-                "--save_dir=/home/jun/work/soongsil/Brainwash/output_tiny_Imagenet_inversion "
+                "--save_dir=/path/to/Brainwash/output_tiny_Imagenet_inversion "
                 "--task_lst=0,1,2,3,4,5,6,7,8 --save_every=1000 --batch_reg --init_acc --n_iters=10000"
             ),
             log_path=f"{LOG_DIR}/tiny_step2.log",
-            expected_artifacts=[f"{base}/soongsil/Brainwash/output_tiny_Imagenet_inversion/**/*.npz"],
+            expected_artifacts=[f"{base}/Brainwash/output_tiny_Imagenet_inversion/**/*.npz"],
             analysis_prompt=(
                 "Summarize progress during inversion on split_tiny_imagenet, "
                 "identify any unusual patterns or warnings, "
@@ -551,17 +569,17 @@ def build_brainwash_tinyimagenet_specs() -> List[StepSpec]:
             rag_request=_concat_rag(base_query, step2_topk),
         ),
 
-        # ---------------------- 3단계: Brainwash reckless mode ----------------------
+        # ---------------------- Stage 3: Brainwash reckless mode ----------------------
         StepSpec(
             title="TinyImageNet steps 3/4",
             command=(
-                "CUDA_VISIBLE_DEVICES=2 python /home/jun/work/soongsil/Brainwash/main_brainwash.py "
+                "CUDA_VISIBLE_DEVICES=2 python /path/to/Brainwash/main_brainwash.py "
                 "--extra_desc=reckless_test "
-                "--pretrained_model_add=/home/jun/work/soongsil/Brainwash/checkpoint/data_tinyImagenet/"
+                "--pretrained_model_add=/path/to/Brainwash/checkpoint/data_tinyImagenet/"
                 "ewc_lamb_500000.0__model_type_resnet_dataset_split_tiny_imagenet_class_num_20_bs_16_lr_0.01_n_epochs_20__"
                 "model_name_ResNet_task_num_9__seed_0_emb_fact_9_im_sz_64_.pkl "
                 "--mode='reckless' --target_task_for_eval=0 --delta=0.3 --seed=0 --eval_every=10 "
-                "--distill_folder=/home/jun/work/soongsil/Brainwash/output_tiny_Imagenet_inversion "
+                "--distill_folder=/path/to/Brainwash/output_tiny_Imagenet_inversion "
                 "--init_acc --noise_norm=inf --cont_learner_lr=0.001 --n_epochs=51 --save_every=50"
             ),
             log_path=f"{LOG_DIR}/tiny_step3.log",
@@ -576,14 +594,14 @@ def build_brainwash_tinyimagenet_specs() -> List[StepSpec]:
             rag_request=_concat_rag(base_query, step3_topk),
         ),
 
-        # ---------------------- 4단계: 최종 평가 ----------------------
+        # ---------------------- Stage 4: Final Evaluation ----------------------
         StepSpec(
             title="TinyImageNet steps 4/4",
             command=(
-                "CUDA_VISIBLE_DEVICES=2 python /home/jun/work/soongsil/Brainwash/main_baselines.py "
+                "CUDA_VISIBLE_DEVICES=2 python /path/to/Brainwash/main_baselines.py "
                 "--experiment split_tiny_imagenet --approach ewc --lasttask 9 --tasknum 10 --nepochs 20 --batch-size 16 "
                 "--lr 0.01 --clip 100. --lamb 500000 --lamb_emp 100 "
-                "--checkpoint=/home/jun/work/soongsil/Brainwash/checkpoint_noise/tiny_imagenet/"
+                "--checkpoint=/path/to/Brainwash/checkpoint_noise/tiny_imagenet/"
                 "noise_ewc_reckless_test__delta_0.3_dataset_split_tiny_imagenet_target_task_0_attacked_task_9_"
                 "noise_optim_lr_0.005__n_iters_1_n_epochs_51_seed_0_mode_reckless____min_acc_target_5.pkl "
                 "--init_acc --addnoise"
@@ -605,24 +623,24 @@ def build_brainwash_tinyimagenet_specs() -> List[StepSpec]:
 def build_brainwash_cifar10_specs() -> List[StepSpec]:
     base = BASE_DIR
 
-    # 공통 베이스 쿼리 (cifar10용)
+    # Common base query (for cifar10)
     base_query = (
         "brainwash continual learning poisoning ewc split_cifar10 cifar10 "
         "fisher diagonal catastrophic forgetting average accuracy BWT"
     )
 
-    # Top-K는 메커니즘만 동일하게 유지 (초기에는 비어 있어도 OK)
-    step1_topk = ""  # 초기 학습 단계는 이전 스텝 없음
+    # Keep only the Top-K mechanism identical (may be empty at the start)
+    step1_topk = ""  # initial training stage has no prior step
     step2_topk = _load_topk_for_step("c10_step1")
     step3_topk = _load_topk_for_step("c10_step2")
     step4_topk = _load_topk_for_step("c10_step3")
 
     return [
-        # ---------------------- 1단계: Train ----------------------
+        # ---------------------- Stage 1: Train ----------------------
         StepSpec(
-            title="CIFAR10 단계 1/4: 초기 모델 학습 (EWC)",
+            title="CIFAR10 Stage 1/4: Initial Model Training (EWC)",
             command=(
-                "CUDA_VISIBLE_DEVICES=1 python /home/jun/work/soongsil/Brainwash/main_baselines.py "
+                "CUDA_VISIBLE_DEVICES=1 python /path/to/Brainwash/main_baselines.py "
                 "--experiment split_cifar10 --approach ewc --lasttask 4 --tasknum 5 --nepochs 20 "
                 "--batch-size 16 --lamb 500000 --lamb_emp 100 --clip 100. --lr 0.01"
             ),
@@ -637,22 +655,22 @@ def build_brainwash_cifar10_specs() -> List[StepSpec]:
             rag_request=_concat_rag(base_query, step1_topk),
         ),
 
-        # ---------------------- 2단계: inversion ----------------------
+        # ---------------------- Stage 2: inversion ----------------------
         StepSpec(
-            title="CIFAR10 단계 2/4: 역공격 (Inversion)",
+            title="CIFAR10 Stage 2/4: Inversion Attack",
             command=(
-                "CUDA_VISIBLE_DEVICES=1 python /home/jun/work/soongsil/Brainwash/main_inv.py "
-                "--pretrained_model_add=/home/jun/work/soongsil/Brainwash/checkpoint/data_cifar10/"
+                "CUDA_VISIBLE_DEVICES=1 python /path/to/Brainwash/main_inv.py "
+                "--pretrained_model_add=/path/to/Brainwash/checkpoint/data_cifar10/"
                 "ewc_lamb_500000.0__model_type_resnet_dataset_split_cifar10_class_num_2_bs_16_lr_0.01_n_epochs_20__"
                 "model_name_ResNet_task_num_4__seed_0_emb_fact_1_im_sz_32_.pkl "
                 "--num_samples=512 "
-                "--save_dir=/home/jun/work/soongsil/Brainwash/output_cifar10_inversion "
+                "--save_dir=/path/to/Brainwash/output_cifar10_inversion "
                 "--task_lst=0,1,2,3 --save_every=1000 --batch_reg --init_acc "
                 "--n_iters=40000"
             ),
             log_path=f"{LOG_DIR}/c10_step2.log",
             expected_artifacts=[
-                f"{base}/soongsil/Brainwash/output_cifar10_inversion/**/*.npz"
+                f"{base}/Brainwash/output_cifar10_inversion/**/*.npz"
             ],
             analysis_prompt=(
                 "Summarize progress during inversion on split_cifar10, identify any unusual patterns or warnings, "
@@ -662,17 +680,17 @@ def build_brainwash_cifar10_specs() -> List[StepSpec]:
             rag_request=_concat_rag(base_query, step2_topk),
         ),
 
-        # ---------------------- 3단계: Brainwash reckless mode ----------------------
+        # ---------------------- Stage 3: Brainwash reckless mode ----------------------
         StepSpec(
-            title="CIFAR10 단계 3/4: Brainwash Reckless Mode 적용",
+            title="CIFAR10 Stage 3/4: Apply Brainwash Reckless Mode",
             command=(
-                "CUDA_VISIBLE_DEVICES=0 python /home/jun/work/soongsil/Brainwash/main_brainwash.py "
+                "CUDA_VISIBLE_DEVICES=0 python /path/to/Brainwash/main_brainwash.py "
                 "--extra_desc=reckless_test "
-                "--pretrained_model_add=/home/jun/work/soongsil/Brainwash/checkpoint/data_cifar10/"
+                "--pretrained_model_add=/path/to/Brainwash/checkpoint/data_cifar10/"
                 "ewc_lamb_500000.0__model_type_resnet_dataset_split_cifar10_class_num_2_bs_16_lr_0.01_n_epochs_20__"
                 "model_name_ResNet_task_num_4__seed_0_emb_fact_1_im_sz_32_.pkl "
                 "--mode='reckless' --target_task_for_eval=0 --delta=0.7 --seed=0 --eval_every=10 "
-                "--distill_folder=/home/jun/work/soongsil/Brainwash/inverse_file/cifar_10 "
+                "--distill_folder=/path/to/Brainwash/inverse_file/cifar_10 "
                 "--init_acc --noise_norm=inf --cont_learner_lr=0.002 "
                 "--n_epochs=301 --save_every=300"
             ),
@@ -688,14 +706,14 @@ def build_brainwash_cifar10_specs() -> List[StepSpec]:
             rag_request=_concat_rag(base_query, step3_topk),
         ),
 
-        # ---------------------- 4단계: 최종 평가 ----------------------
+        # ---------------------- Stage 4: Final Evaluation ----------------------
         StepSpec(
-            title="CIFAR10 단계 4/4: 최종 평가",
+            title="CIFAR10 Stage 4/4: Final Evaluation",
             command=(
-                "CUDA_VISIBLE_DEVICES=0 python /home/jun/work/soongsil/Brainwash/main_baselines.py "
+                "CUDA_VISIBLE_DEVICES=0 python /path/to/Brainwash/main_baselines.py "
                 "--experiment split_cifar10 --approach ewc --lasttask 4 --tasknum 5 --nepochs 80 "
                 "--batch-size 16 --lr 0.01 --clip 100. --lamb 50000 --lamb_emp 100 "
-                "--checkpoint /home/jun/work/noise_ewc_reckless_test__delta_0.7_dataset_split_cifar10_target_task_0_"
+                "--checkpoint /path/to/noise_ewc_reckless_test__delta_0.7_dataset_split_cifar10_target_task_0_"
                 "attacked_task_4_noise_optim_lr_0.005__n_iters_1_n_epochs_301_seed_0_mode_reckless____min_acc_target_"
                 "70.pkl "
                 "--init_acc --addnoise"
@@ -715,8 +733,8 @@ def build_brainwash_cifar10_specs() -> List[StepSpec]:
 
 def build_analyze_accumulative_specs() -> List[StepSpec]:
     """
-    Accumulative Attack 로그를 RAG + GPT로 분석하기 위한 스펙 빌더.
-    필요에 따라 로그 파일 경로를 추가/수정해도 됨.
+    Spec builder for analyzing Accumulative Attack logs with RAG + GPT.
+    Add or modify log file paths as needed.
     """
     base_query = (
         "You are a machine learning results analysis expert."
@@ -754,7 +772,7 @@ def build_analyze_accumulative_specs() -> List[StepSpec]:
 
 def build_mmd_backdoor_specs() -> List[StepSpec]:
     """
-    Multi-Level MMD Regularization 기반 backdoor(MMD) 학습 + 시각화 파이프라인
+    Backdoor (MMD) training + visualization pipeline based on Multi-Level MMD Regularization
     """
     base_query = (
         "multi-level mmd regularization backdoor training vgg11 cifar10 "
@@ -763,26 +781,26 @@ def build_mmd_backdoor_specs() -> List[StepSpec]:
 
     # 1) MMD Training
     step1_cmd = (
-        "python /home/jun/work/soongsil/backdoor/Multi-Level-MMD-Regularization/train.py "
-        "--data_path /home/jun/work/data/cifar-10-batches-py "
+        "python /path/to/backdoor/Multi-Level-MMD-Regularization/train.py "
+        "--data_path /path/to/data/cifar-10-batches-py "
         "--data_name cifar10 "
         "--model_name vgg11 "
         "--mlmmdr_lamb 0.1 "
         "--mlmmdr_layer all"
     )
 
-    # 2) MMD Visualization (학습 결과 weight를 사용)
+    # 2) MMD Visualization (uses the trained weights)
     step2_cmd = (
         "python visualize.py "
-        "--data_path /home/jun/work/data/cifar-10-batches-py "
+        "--data_path /path/to/data/cifar-10-batches-py "
         "--data_name cifar10 "
         "--model_name vgg11 "
         "--mlmmdr_lamb 0.1 "
         "--mlmmdr_layer all "
-        "--weight_path /home/jun/work/soongsil/backdoor/Multi-Level-MMD-Regularization/weights"
+        "--weight_path /path/to/backdoor/Multi-Level-MMD-Regularization/weights"
     )
 
-    # Top-K 주입(원하면): step2는 step1에서 나온 topk를 붙임
+    # Top-K injection (optional): step2 appends the topk produced by step1
     step2_topk = _load_topk_for_step("mmd_step1")
 
     return [
@@ -791,7 +809,7 @@ def build_mmd_backdoor_specs() -> List[StepSpec]:
             command=step1_cmd,
             log_path=f"{LOG_DIR}/mmd_step1_train.log",
             expected_artifacts=[
-                # 저장 포맷이 pt/pth/pkl 중 무엇이든 잡히게 넓게
+                # Broad patterns so any of pt/pth/pkl save formats are matched
                 f"{BASE_DIR}/**/*.pth",
                 f"{BASE_DIR}/**/*.pt",
                 f"{BASE_DIR}/**/*.pkl",
@@ -807,7 +825,7 @@ def build_mmd_backdoor_specs() -> List[StepSpec]:
             command=step2_cmd,
             log_path=f"{LOG_DIR}/mmd_step2_visualize.log",
             expected_artifacts=[
-                # visualize가 figure_path 같은 걸 만들면 여기 패턴을 그쪽으로 맞추는 게 베스트
+                # If visualize produces something like figure_path, it is best to align these patterns to it
                 f"{BASE_DIR}/**/*.png",
                 f"{BASE_DIR}/**/*.jpg",
                 f"{BASE_DIR}/**/*.jpeg",
@@ -824,7 +842,7 @@ def build_mmd_backdoor_specs() -> List[StepSpec]:
 
 def build_mmd_backdoor_cifar100_specs() -> List[StepSpec]:
     """
-    Multi-Level MMD Regularization 기반 backdoor(MMD) 학습 + 시각화 파이프라인 (CIFAR-100)
+    Backdoor (MMD) training + visualization pipeline based on Multi-Level MMD Regularization (CIFAR-100)
     """
     base_query = (
         "multi-level mmd regularization backdoor training vgg11 cifar100 "
@@ -833,8 +851,8 @@ def build_mmd_backdoor_cifar100_specs() -> List[StepSpec]:
 
     # 1) MMD Training (CIFAR-100)
     step1_cmd = (
-        "python /home/jun/work/soongsil/backdoor/Multi-Level-MMD-Regularization/train.py "
-        "--data_path /home/jun/work/data/cifar-100-python "
+        "python /path/to/backdoor/Multi-Level-MMD-Regularization/train.py "
+        "--data_path /path/to/data/cifar-100-python "
         "--data_name cifar100 "
         "--model_name vgg11 "
         "--mlmmdr_lamb 0.1 "
@@ -842,19 +860,19 @@ def build_mmd_backdoor_cifar100_specs() -> List[StepSpec]:
     )
 
     # 2) MMD Visualization (CIFAR-100)
-    # visualize.py가 어디서 실행되는지에 따라 상대경로가 깨질 수 있어서
-    # 가능하면 절대경로로 박아두는 걸 추천.
+    # Relative paths may break depending on where visualize.py is run from,
+    # so it is recommended to hard-code absolute paths when possible.
     step2_cmd = (
-        "python /home/jun/work/soongsil/backdoor/Multi-Level-MMD-Regularization/visualize.py "
-        "--data_path /home/jun/work/data/cifar-100-python "
+        "python /path/to/backdoor/Multi-Level-MMD-Regularization/visualize.py "
+        "--data_path /path/to/data/cifar-100-python "
         "--data_name cifar100 "
         "--model_name vgg11 "
         "--mlmmdr_lamb 0.1 "
         "--mlmmdr_layer all "
-        "--weight_path /home/jun/work/soongsil/backdoor/Multi-Level-MMD-Regularization/weights"
+        "--weight_path /path/to/backdoor/Multi-Level-MMD-Regularization/weights"
     )
 
-    # (선택) Top-K 주입: CIFAR100 전용 step key를 쓰고 싶으면 step 이름도 같이 맞춰야 함
+    # (optional) Top-K injection: to use a CIFAR100-specific step key, the step name must match accordingly
     step2_topk = _load_topk_for_step("mmd_c100_step1")
 
     return [
@@ -894,7 +912,7 @@ def build_mmd_backdoor_cifar100_specs() -> List[StepSpec]:
 
 def build_detect_specs() -> List[StepSpec]:
     """
-    Neural-Relation-Graph detect.py 실행 스펙
+    Execution spec for Neural-Relation-Graph detect.py
     """
     base = BASE_DIR
     base_query = "Neural Relation Graph label noise outlier detection"
@@ -903,16 +921,16 @@ def build_detect_specs() -> List[StepSpec]:
         StepSpec(
             title="Detect: NRG detect.py",
             command=(
-                "CUDA_VISIBLE_DEVICES=0 python /home/jun/work/soongsil/Detect/Neural-Relation-Graph/detect.py "
-                "-n mae_large_49 --pow 4 --cache_dir /home/jun/work/soongsil/Detect/Neural-Relation-Graph/results"
+                "CUDA_VISIBLE_DEVICES=0 python /path/to/Detect/Neural-Relation-Graph/detect.py "
+                "-n mae_large_49 --pow 4 --cache_dir /path/to/Detect/Neural-Relation-Graph/results"
             ),
             log_path=f"{LOG_DIR}/detect_mae_large",
             expected_artifacts=[
-                # detect.py 출력 폴더가 results_tiny 같은 식이면 거기에 맞춰 수정
-                f"{base}/soongsil/Detect/Neural-Relation-Graph/**/mae_large*",
-                f"{base}/soongsil/Detect/Neural-Relation-Graph/**/*.npy",
-                f"{base}/soongsil/Detect/Neural-Relation-Graph/**/*.json",
-                f"{base}/soongsil/Detect/Neural-Relation-Graph/**/*.png",
+                # If detect.py's output folder is something like results_tiny, adjust these to match
+                f"{base}/Detect/Neural-Relation-Graph/**/mae_large*",
+                f"{base}/Detect/Neural-Relation-Graph/**/*.npy",
+                f"{base}/Detect/Neural-Relation-Graph/**/*.json",
+                f"{base}/Detect/Neural-Relation-Graph/**/*.png",
             ],
             analysis_prompt = (
                 "You are a machine learning security analyst specializing in label-noise and data-poisoning detection. "
@@ -954,7 +972,7 @@ def build_detect_specs() -> List[StepSpec]:
 
 def build_rethink_specs() -> List[StepSpec]:
     """
-    RethinkingLabelPoisoningForGNNs 실행 스펙.
+    Execution spec for RethinkingLabelPoisoningForGNNs.
     """
     base = BASE_DIR
 
@@ -964,7 +982,7 @@ def build_rethink_specs() -> List[StepSpec]:
     )
 
     cmd = (
-        "python /home/jun/work/soongsil/PoisoningAttack/RethinkingLabelPoisoningForGNNs/meta-label-poisoning/meta_label.py --dataset citeseer --setting cv --attack meta --model GCN"
+        "python /path/to/PoisoningAttack/RethinkingLabelPoisoningForGNNs/meta-label-poisoning/meta_label.py --dataset citeseer --setting cv --attack meta --model GCN"
     )
 
     return [
@@ -973,7 +991,7 @@ def build_rethink_specs() -> List[StepSpec]:
             command=cmd,
             log_path=f"{LOG_DIR}/rethink_meta_label_cora_ml_lafak_gcn.log",
             expected_artifacts=[
-                # 결과 파일 형식이 확실치 않아서 wide하게 잡음 (원하면 더 좁혀서 수정 가능)
+                # Result file format is uncertain, so patterns are kept wide (narrow them down if desired)
                 f"{base}/**/*.pth",
                 f"{base}/**/*.pt",
                 f"{base}/**/*.pkl",
@@ -988,14 +1006,14 @@ def build_rethink_specs() -> List[StepSpec]:
                 "Conclude decisively whether the run indicates a successful label-poisoning attack, "
                 "and summarize evidence (numbers + log lines)."
             ),
-            rag_request=_concat_rag(base_query, ""),  # step1은 외부 주입 없음
+            rag_request=_concat_rag(base_query, ""),  # step1 has no external injection
         )
     ]
 
 
 def build_rethink_pubmed_specs() -> List[StepSpec]:
     """
-    RethinkingLabelPoisoningForGNNs PubMed 실행 스펙.
+    Execution spec for RethinkingLabelPoisoningForGNNs on PubMed.
     """
     base = BASE_DIR
 
@@ -1005,7 +1023,7 @@ def build_rethink_pubmed_specs() -> List[StepSpec]:
     )
 
     cmd = (
-        "python /home/jun/work/soongsil/PoisoningAttack/"
+        "python /path/to/PoisoningAttack/"
         "RethinkingLabelPoisoningForGNNs/meta-label-poisoning/meta_label.py "
         "--dataset pubmed --setting cv --attack meta --model GCN --lr 0.001"
     )
@@ -1041,9 +1059,9 @@ def build_rethink_pubmed_specs() -> List[StepSpec]:
 def build_fgsm_specs() -> List[StepSpec]:
     """FGSM / I-FGSM adversarial example generation on a trained MNIST/FMNIST classifier."""
     base_query = "FGSM I-FGSM adversarial example evasion epsilon perturbation Linf classifier accuracy drop"
-    fgsm_dir = "/home/jun/work/soongsil/2nd/evasion/FGSM/FGSM"
+    fgsm_dir = "/path/to/2nd/evasion/FGSM/FGSM"
 
-    # 학습된 체크포인트(checkpoints/mytest/best_acc.tar)를 불러와 적대적 예제 생성
+    # Load the trained checkpoint (checkpoints/mytest/best_acc.tar) and generate adversarial examples
     gen_cmd = (
         f"cd {fgsm_dir} && python main.py "
         "--mode generate --iteration 1 --epsilon 0.03 "
@@ -1066,7 +1084,7 @@ def build_fgsm_specs() -> List[StepSpec]:
                 "vs PGD (iterative multi-step). Decide decisively whether an attack occurred or not."
             ),
             rag_request=_concat_rag(base_query, _load_topk_for_step("step1")),
-            # 생성된 적대적 예제 이미지(legitimate/perturbed/changed)를 GPT Vision 분석에 사용
+            # Feed the generated adversarial-example images (legitimate/perturbed/changed) to GPT Vision analysis
             vision_globs=[
                 f"{fgsm_dir}/output/mytest/legitimate*.jpg",
                 f"{fgsm_dir}/output/mytest/perturbed*.jpg",
@@ -1079,15 +1097,15 @@ def build_fgsm_specs() -> List[StepSpec]:
 def build_pgd_specs() -> List[StepSpec]:
     """PGD (Madry) Linf attack on the MNIST challenge model: build adv set, then evaluate."""
     base_query = "PGD Madry Linf adversarial robustness epsilon k steps MNIST accuracy under attack evasion"
-    pgd_dir = "/home/jun/work/soongsil/2nd/evasion/PGD/mnist_challenge"
+    pgd_dir = "/path/to/2nd/evasion/PGD/mnist_challenge"
 
-    # 1) 적대적 예제 생성 (config.json 설정 사용, attack.npy 저장)
+    # 1) Generate adversarial examples (uses config.json settings, saves attack.npy)
     step1_cmd = f"cd {pgd_dir} && python pgd_attack.py"
-    # 2) 저장된 attack.npy로 모델 정확도 평가 (clean vs adversarial)
+    # 2) Evaluate model accuracy on the saved attack.npy (clean vs adversarial)
     step2_cmd = f"cd {pgd_dir} && python run_attack.py"
-    # 3) attack.npy(적대적 예제 배열)를 격자 PNG로 렌더링해 Vision 분석에 사용
+    # 3) Render attack.npy (the adversarial-example array) as a grid PNG for Vision analysis
     pgd_grid_png = f"{LOG_DIR}/pgd_adv_grid.png"
-    viz_script = "/home/jun/work/soongsil/Agent/main/pgd_visualize.py"
+    viz_script = "/path/to/Agent/main/pgd_visualize.py"
     step3_cmd = f"cd {pgd_dir} && python {viz_script} {pgd_dir}/attack.npy {pgd_grid_png}"
 
     step2_topk = _load_topk_for_step("step1")
@@ -1130,7 +1148,7 @@ def build_pgd_specs() -> List[StepSpec]:
                 "attack occurred or not."
             ),
             rag_request=_concat_rag(base_query + " adversarial example visualization perturbation grid", step2_topk),
-            # 렌더링된 적대적 예제 격자 이미지를 GPT Vision 분석에 사용
+            # Feed the rendered adversarial-example grid image to GPT Vision analysis
             vision_globs=[pgd_grid_png],
         ),
     ]
@@ -1154,14 +1172,14 @@ def build_physpatch_specs() -> List[StepSpec]:
         "PhysPatch physical adversarial patch VLM multimodal large language model autonomous driving "
         "attack success rate transferability perception manipulation stop sign"
     )
-    phys_dir = "/home/jun/work/soongsil/2nd/evasion/Physpatch/physpatch/code"
+    phys_dir = "/path/to/2nd/evasion/Physpatch/physpatch/code"
     som_dir = f"{phys_dir}/SoM"
     key = '"$OPENAI_API_KEY"'  # shell-expanded at run time; never store the literal key
 
-    # PhysPatch는 별도 conda 환경(physpatch, detectron2 포함)이 필요하다.
-    # /bin/sh 에서는 `conda activate`가 안 되므로 해당 env의 python을 절대경로로 직접 호출한다.
-    # (PHYSPATCH_PYTHON 환경변수로 덮어쓸 수 있음)
-    py = os.environ.get("PHYSPATCH_PYTHON", "/home/junseok/anaconda3/envs/physpatch/bin/python")
+    # PhysPatch requires a separate conda environment (physpatch, including detectron2).
+    # Since `conda activate` does not work under /bin/sh, invoke that env's python directly by absolute path.
+    # (Overridable via the PHYSPATCH_PYTHON environment variable.)
+    py = os.environ.get("PHYSPATCH_PYTHON", "/path/to/anaconda3/envs/physpatch/bin/python")
 
     # 1) Set-of-Marks segmentation (SAM) over clean driving images
     step1_cmd = (
@@ -1245,7 +1263,7 @@ def build_physpatch_specs() -> List[StepSpec]:
                 "(PhysPatch) rather than full-image L-inf noise. Judge from behavior, not file/command names."
             ),
             rag_request=_concat_rag(base_query + " adversarial patch optimization dynamic mask epsilon iterations", topk4),
-            # 패치가 적용된 결과 이미지를 GPT Vision으로 분석
+            # Analyze the patch-applied result images with GPT Vision
             vision_globs=[
                 f"{phys_dir}/results/pgd/images/*.png",
                 f"{phys_dir}/results/pgd/images/*.jpg",

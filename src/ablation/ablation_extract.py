@@ -4,11 +4,11 @@
 from __future__ import annotations
 import os, re, glob, json
 
-VARIANTS = {
-    "full":      "/home/jun/work/soongsil/Agent/A_result",
-    "no_memory": "/home/jun/work/soongsil/Agent/A_result_no_memory",
-    "no_topk":   "/home/jun/work/soongsil/Agent/A_result_no_topk",
-    "no_rag":    "/home/jun/work/soongsil/Agent/A_result_norag",
+VARIANTS = {                       # <-- point these to your ablation result directories
+    "full":      "./results/full",
+    "no_memory": "./results/no_memory",
+    "no_topk":   "./results/no_topk",
+    "no_rag":    "./results/no_rag",
 }
 
 # ground truth attack per scenario key
