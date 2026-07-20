@@ -12,32 +12,19 @@ of security papers, scored with RAGAS-style metrics, and the most salient terms 
 
 ## How it works
 
-```
-                 ┌───────────────────────────── per step ─────────────────────────────┐
- attack pipeline │  run shell command ──► step log                                     │
- (StepSpec list) │        │                                                            │
-                 │        ▼                                                             │
-                 │  ┌───────────┐   ┌──────────────┐   ┌───────────────┐   ┌─────────┐ │
-                 │  │  RAG      │──►│  Summarizer   │──►│  RAGAS score  │──►│ Top-K   │ │
-                 │  │ (Chroma)  │   │ (LLM+memory)  │   │ faith/rel/ctx │   │ extract │ │
-                 │  └───────────┘   └──────────────┘   └───────────────┘   └────┬────┘ │
-                 │        ▲                                                     │       │
-                 │        └──────── inject Top-K into NEXT step's query ◄───────┘       │
-                 └────────────────────────────────────────────────────────────────────┘
-                                              │
-                                              ▼
-                                   attack verdict + JSON report
-```
+<p align="center">
+  <img src="assets/tracer_workflow.png"
+       alt="Multi-step autonomous diagnostic process of TRACER"
+       width="100%">
+</p>
 
-Core components (`src/Tracer_Agent.py`):
-- **`MemoryManager`** — per-session summary history via LangChain `FileChatMessageHistory`.
-- **`RAGRetriever`** — queries a ChromaDB `papers` collection, synthesizes evidence with the LLM.
-- **`Summarizer`** — builds each step summary from *previous summaries + RAG snippet + Top-K + log tail*.
-- **`RAGASEvaluator`** — faithfulness (LLM judge), answer relevance (embedding cosine), context relevance.
-- **Top-K injection** — extracts salient terms from `(summary + log)` and merges them into the next step's RAG query.
-- **Vision path** — for MMD-backdoor pipelines, analyzes figure PNGs with GPT vision.
-
----
+<p align="center">
+  <em>
+    TRACER sequentially executes attack pipelines, analyzes execution logs
+    using accumulated memory and retrieved knowledge, evaluates diagnostic
+    reliability, and injects semantic Top-K clues into the next analysis step.
+  </em>
+</p>
 
 ## Repository layout
 
