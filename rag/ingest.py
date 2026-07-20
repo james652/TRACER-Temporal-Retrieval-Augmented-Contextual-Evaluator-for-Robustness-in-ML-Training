@@ -20,9 +20,9 @@ papers = [
         "id_prefix": "paper1",
         "pdf_path": "./papers/your_paper.pdf",  # <-- put the path to your PDF here
         "metadata": {
-            "title": "Paper title",
-            "authors": "Author One; Author Two",
-            "year": 2024,
+            "title": "Paper title",              # <-- put the paper title here
+            "authors": "Author One; Author Two",  # <-- authors, semicolon-separated
+            "year": 2024,                         # <-- publication year (int)
         },
     },
     # Add more papers here, each following the paper1 template above.
