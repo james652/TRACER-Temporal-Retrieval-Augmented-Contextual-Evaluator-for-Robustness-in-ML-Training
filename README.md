@@ -47,17 +47,29 @@ The paper evaluates TRACER on four training-phase threat scenarios. The agent de
 **Brainwash / Accumulative Attack / Label Flipping / MMDRegularization / No Attack**, with a risk
 level of 1–5.
 
-| Scenario | CLI choice(s) | Datasets | Diagnostic signature |
-|----------|---------------|----------|----------------------|
-| **Brainwash** (continual learning) | `Brainwash`, `brainwash_cifar10`, `brainwash_miniimagenet`, `brainwash_tinyimagenet` | CIFAR-100, CIFAR-10, Mini-ImageNet, Tiny-ImageNet | selective forgetting — prior tasks drop, last task stays high |
-| **Accumulative Poisoning** | `Accumulative`, `accumulative_cifar100` | CIFAR-10, CIFAR-100 | delayed global collapse — stable until a trigger, then abrupt drop |
-| **Label Flipping** (GNN) | `Rethink`, `Rethink_pub` | Citeseer (GCN) | test accuracy decreases monotonically as poisoning budget rises |
-| **Label Error** (detection) | `Detect` | Neural Relation Graph, 8% label noise | detection metrics — ROC-AUC / AP / TNR@95 |
+| Scenario | Reference implementation | CLI choice(s) | Datasets | Diagnostic signature |
+|----------|--------------------------|---------------|----------|----------------------|
+| **Brainwash** (continual learning) | [mint-vu/Brainwash](https://github.com/mint-vu/Brainwash) | `Brainwash`, `brainwash_cifar10`, `brainwash_miniimagenet`, `brainwash_tinyimagenet` | CIFAR-100, CIFAR-10, Mini-ImageNet, Tiny-ImageNet | selective forgetting: prior tasks drop while the last task remains high |
+| **Accumulative Poisoning** | [ShawnXYang/AccumulativeAttack](https://github.com/ShawnXYang/AccumulativeAttack) | `Accumulative`, `accumulative_cifar100` | CIFAR-10, CIFAR-100 | delayed global collapse: performance remains stable until a trigger causes an abrupt drop |
+| **Label Flipping** (GNN) | [VijayLingam95/RethinkingLabelPoisoningForGNNs](https://github.com/VijayLingam95/RethinkingLabelPoisoningForGNNs) | `Rethink`, `Rethink_pub` | Citeseer (GCN) | test accuracy decreases monotonically as the poisoning budget increases |
+| **Label Error** (detection) | [snu-mllab/Neural-Relation-Graph](https://github.com/snu-mllab/Neural-Relation-Graph) | `Detect` | Tiny ImageNet with 8% label noise | label-error detection using ROC-AUC, AP, and TNR@95 |
 
-`src/attack_spec.py` also ships additional builders beyond the paper's main evaluation:
-`MMD_backdoor`, `MMD_backdoor_cifar100`, and test-time adversarial examples (`FGSM`, `PGD`, `PhysPatch`).
+> [!NOTE]
+> These external repositories provide the original or reference implementations used to construct
+> the evaluated attack and detection pipelines. They are not included in this repository and must
+> be downloaded and configured separately.
 
----
+`src/attack_spec.py` also includes additional pipeline builders beyond the paper's four main
+evaluation scenarios:
+
+- `MMD_backdoor`
+- `MMD_backdoor_cifar100`
+- `FGSM`
+- `PGD`
+- `PhysPatch`
+
+These additional builders are provided for extended experiments and are not part of the paper's
+primary four-scenario evaluation.
 
 ## Repository layout
 
