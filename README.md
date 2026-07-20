@@ -2,10 +2,11 @@
 
 **Temporal Retrieval-Augmented Contextual Evaluator for Robustness in ML Training**
 
-Official implementation of the paper "[TRACER: Temporal Retrieval-Augmented Contextual Evaluator for Robustness in ML Training](https://www.sciencedirect.com/science/article/pii/S0957417426025765)", by Junseok Shin, Jinhyeok Jang, Sohee Park, Jinwoo Lee, and Daeseon Choi (AI Safety Center, Soongsil University). Published in *Expert Systems with Applications* (Elsevier).
+Official implementation of the paper "[TRACER: Temporal Retrieval-Augmented Contextual Evaluator for Robustness in ML Training](https://www.sciencedirect.com/science/article/pii/S0957417426025765)".
 
-TRACER is an LLM-agent framework that **orchestrates ML data-poisoning / backdoor / adversarial
-attack pipelines, reads their execution logs, and decides *which attack occurred* (if any).**
+TRACER is an LLM-agent framework for analyzing **training-phase vulnerabilities** in ML. It
+orchestrates data-poisoning and label-manipulation attack pipelines, reads their execution logs,
+and decides *which attack occurred* (if any).
 Each step is summarized with a memory-carrying LLM chain, grounded against a RAG knowledge base
 of security papers, scored with RAGAS-style metrics, and the most salient terms are extracted and
 **injected into the next step's retrieval query** (the "temporal" feedback loop). It complements
@@ -44,12 +45,25 @@ The paper evaluates TRACER on four training-phase threat scenarios. The agent de
 **Brainwash / Accumulative Attack / Label Flipping / MMDRegularization / No Attack**, with a risk
 level of 1–5.
 
-| Scenario | Reference implementation | CLI choice(s) | Datasets | Diagnostic signature |
-|----------|--------------------------|---------------|----------|----------------------|
-| **Brainwash** (continual learning) | [mint-vu/Brainwash](https://github.com/mint-vu/Brainwash) | `Brainwash`, `brainwash_cifar10`, `brainwash_miniimagenet`, `brainwash_tinyimagenet` | CIFAR-100, CIFAR-10, Mini-ImageNet, Tiny-ImageNet | selective forgetting: prior tasks drop while the last task remains high |
-| **Accumulative Poisoning** | [ShawnXYang/AccumulativeAttack](https://github.com/ShawnXYang/AccumulativeAttack) | `Accumulative`, `accumulative_cifar100` | CIFAR-10, CIFAR-100 | delayed global collapse: performance remains stable until a trigger causes an abrupt drop |
-| **Label Flipping** (GNN) | [VijayLingam95/RethinkingLabelPoisoningForGNNs](https://github.com/VijayLingam95/RethinkingLabelPoisoningForGNNs) | `Rethink`, `Rethink_pub` | Citeseer (GCN) | test accuracy decreases monotonically as the poisoning budget increases |
-| **Label Error** (detection) | [snu-mllab/Neural-Relation-Graph](https://github.com/snu-mllab/Neural-Relation-Graph) | `Detect` | Tiny ImageNet with 8% label noise | label-error detection using ROC-AUC, AP, and TNR@95 |
+**Brainwash** (continual learning). *Selective forgetting: earlier tasks drop while the last task stays high.*
+- **Reference:** [mint-vu/Brainwash](https://github.com/mint-vu/Brainwash)
+- **CLI:** `Brainwash`, `brainwash_cifar10`, `brainwash_miniimagenet`, `brainwash_tinyimagenet`
+- **Datasets:** CIFAR-100, CIFAR-10, Mini-ImageNet, Tiny-ImageNet
+
+**Accumulative Poisoning.** *Delayed global collapse: performance stays stable until a trigger causes an abrupt drop.*
+- **Reference:** [ShawnXYang/AccumulativeAttack](https://github.com/ShawnXYang/AccumulativeAttack)
+- **CLI:** `Accumulative`, `accumulative_cifar100`
+- **Datasets:** CIFAR-10, CIFAR-100
+
+**Label Flipping** (GNN). *Test accuracy decreases monotonically as the poisoning budget increases.*
+- **Reference:** [VijayLingam95/RethinkingLabelPoisoningForGNNs](https://github.com/VijayLingam95/RethinkingLabelPoisoningForGNNs)
+- **CLI:** `Rethink`, `Rethink_pub`
+- **Datasets:** Citeseer (GCN)
+
+**Label Error** (detection). *Label-error detection using ROC-AUC, AP, and TNR@95.*
+- **Reference:** [snu-mllab/Neural-Relation-Graph](https://github.com/snu-mllab/Neural-Relation-Graph)
+- **CLI:** `Detect`
+- **Datasets:** Tiny ImageNet with 8% label noise
 
 > [!NOTE]
 > These external repositories provide the original or reference implementations used to construct
