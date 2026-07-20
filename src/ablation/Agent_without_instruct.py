@@ -46,11 +46,7 @@ from attack_spec import (
     build_brainwash_cifar10_specs,
     build_accumulative_specs,
     build_accumulative_cifar100_specs, 
-    build_analyze_brainwash_specs,
-    build_analyze_accumulative_specs,
-    build_mmd_backdoor_specs, 
-    build_mmd_backdoor_cifar100_specs,
-    build_detect_specs, 
+    build_detect_specs,
     build_rethink_specs,
     build_rethink_pubmed_specs,
 )
@@ -1265,76 +1261,41 @@ def pretty_print_attack_result(obj: Dict[str, Any]) -> str:
 # ====================================================================================
 if __name__ == "__main__":
     os.makedirs(LOG_DIR, exist_ok=True)
-    choice = input("Which program should run? (Brainwash / brainwash_miniimagenet/ brainwash_cifar10 / accumulative_cifar100/ brainwash_tinyimagenet / Accumulative / Test / Analysis / Analysis_Accumulative  / MMD_backdoor / MMD_backdoor_cifar100 / Detect / Rethink/ Rethink_pub) [Brainwash]: ").strip() or "Brainwash"
+    choice = input("Which program should run? (Brainwash / brainwash_miniimagenet/ brainwash_cifar10 / accumulative_cifar100/ brainwash_tinyimagenet / Accumulative / Detect / Rethink/ Rethink_pub) [Brainwash]: ").strip() or "Brainwash"
 
-    if choice.lower() in ("analysis", "analyze", "a"):
-        specs = build_analyze_brainwash_specs()
-        session_id = f"analysis_{time.strftime('%Y%m%d_%H%M%S')}"
-        analyzer = Analyzer(LOG_DIR, model="gpt-5")
-        report = analyzer.analyze(specs, session_id=session_id)
+    # Legacy execution path + Top-K injection
+    build = {
+        "brainwash": build_brainwash_specs,
+        "bw": build_brainwash_specs,
+        "brainwash_miniimagenet": build_brainwash_miniimagenet_specs,
+        "brainwash_tinyimagenet": build_brainwash_tinyimagenet_specs,
+        "brainwash_cifar10": build_brainwash_cifar10_specs,
+        "accumulative": build_accumulative_specs,
+        "accumulative_cifar100": build_accumulative_cifar100_specs,
+        "accu": build_accumulative_specs,
+        "acc": build_accumulative_specs,
+        "detect": build_detect_specs,
+        "rethink": build_rethink_specs,
+        "rethink_pub": build_rethink_pubmed_specs,
+    }.get(choice.lower(), build_brainwash_specs)
 
-        out_path = os.path.join(LOG_DIR, "analysis.json")
-        with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(report, f, ensure_ascii=False, indent=2)
+    specs = build()
+    results = monitor_pipeline(
+        specs,
+        use_gpt=True,
+        gpt_model="gpt-5",
+        pipeline_tag=choice.lower(),
+        use_langchain_analysis=True,
+        fallback_gpt_verify=False,
+    )
+    report = build_report(results, gpt_model="gpt-5")
 
-        print("\n" + "=" * 40)
-        print("=== ANALYSIS REPORT (JSON) ===")
-        print("=" * 40)
-        print(json.dumps(report, ensure_ascii=False, indent=2))
-        print(f"\nAnalysis saved to: {out_path}")
+    print("\n" + "=" * 40)
+    print("=== EXECUTION & MONITOR REPORT (JSON) ===")
+    print("=" * 40)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
 
-    elif choice.lower() in ("analysis_accumulative", "analyze_accumulative", "aa"):
-        specs = build_analyze_accumulative_specs()
-        session_id = f"analysis_accu_{time.strftime('%Y%m%d_%H%M%S')}"
-        analyzer = Analyzer(LOG_DIR, model="gpt-5")
-        report = analyzer.analyze(specs, session_id=session_id)
-
-        out_path = os.path.join(LOG_DIR, "analysis_accumulative.json")
-        with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(report, f, ensure_ascii=False, indent=2)
-
-        print("\n" + "=" * 40)
-        print("=== ACCUMULATIVE ANALYSIS REPORT (JSON) ===")
-        print("=" * 40)
-        print(json.dumps(report, ensure_ascii=False, indent=2))
-        print(f"\nAnalysis saved to: {out_path}")
-
-    else:
-        # Legacy execution path + Top-K injection
-        build = {
-            "brainwash": build_brainwash_specs,
-            "bw": build_brainwash_specs,
-            "brainwash_miniimagenet": build_brainwash_miniimagenet_specs,
-            "brainwash_tinyimagenet": build_brainwash_tinyimagenet_specs,
-            "brainwash_cifar10": build_brainwash_cifar10_specs, 
-            "accumulative": build_accumulative_specs,
-            "accumulative_cifar100": build_accumulative_cifar100_specs, 
-            "accu": build_accumulative_specs,
-            "acc": build_accumulative_specs,
-            "mmd_backdoor": build_mmd_backdoor_specs,
-            "mmd_backdoor_cifar100": build_mmd_backdoor_cifar100_specs,
-            "detect": build_detect_specs,  
-            "rethink": build_rethink_specs,
-            "rethink_pub": build_rethink_pubmed_specs,
-        }.get(choice.lower(), build_brainwash_specs)
-
-        specs = build()
-        results = monitor_pipeline(
-            specs,
-            use_gpt=True,
-            gpt_model="gpt-5",
-            pipeline_tag=choice.lower(),
-            use_langchain_analysis=True,
-            fallback_gpt_verify=False,
-        )
-        report = build_report(results, gpt_model="gpt-5")
-
-        print("\n" + "=" * 40)
-        print("=== EXECUTION & MONITOR REPORT (JSON) ===")
-        print("=" * 40)
-        print(json.dumps(report, ensure_ascii=False, indent=2))
-
-        out_path = os.path.join(LOG_DIR, f"monitor_summary_{choice.lower()}.json")
-        with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(report, f, ensure_ascii=False, indent=2)
-        print(f"\nReport saved to: {out_path}")
+    out_path = os.path.join(LOG_DIR, f"monitor_summary_{choice.lower()}.json")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(report, f, ensure_ascii=False, indent=2)
+    print(f"\nReport saved to: {out_path}")

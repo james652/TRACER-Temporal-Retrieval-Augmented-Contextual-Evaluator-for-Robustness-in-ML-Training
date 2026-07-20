@@ -31,11 +31,14 @@ temporal interpretation and evidence-grounded explanation on top of their numeri
   </em>
 </p>
 
-Four core modules (`src/Tracer_Agent.py`): **Semantic Top-K clue extraction** (refines the retrieval
-query each step), **Memory management** (LangChain file-based, per-session), **Knowledge retrieval /
-RAG** (ChromaDB, `text-embedding-3-large`, 1000-token chunks / 200-token overlap), and **Reliability
-evaluation** (Ragas: Faithfulness, Answer Relevance, Context Relevance). Default reasoning engine:
-GPT-5 (OpenAI API); the paper also evaluates a GPT-4.1 variant.
+**Four core modules** (`src/Tracer_Agent.py`):
+
+- **Semantic Top-K clue extraction:** refines the retrieval query at each step.
+- **Memory management:** LangChain file-based, per-session summaries.
+- **Knowledge retrieval (RAG):** ChromaDB with `text-embedding-3-large` (1000-token chunks, 200-token overlap).
+- **Reliability evaluation:** Ragas (Faithfulness, Answer Relevance, Context Relevance).
+
+**Reasoning engine:** GPT-5 (OpenAI API) by default; a GPT-4.1 variant is also evaluated.
 
 ---
 
@@ -69,18 +72,6 @@ level of 1–5.
 > These external repositories provide the original or reference implementations used to construct
 > the evaluated attack and detection pipelines. They are not included in this repository and must
 > be downloaded and configured separately.
-
-`src/attack_spec.py` also includes additional pipeline builders beyond the paper's four main
-evaluation scenarios:
-
-- `MMD_backdoor`
-- `MMD_backdoor_cifar100`
-- `FGSM`
-- `PGD`
-- `PhysPatch`
-
-These additional builders are provided for extended experiments and are not part of the paper's
-primary four-scenario evaluation.
 
 ## Repository layout
 
@@ -144,8 +135,7 @@ codebases, whose paths are written as `/path/to/...` placeholders, e.g.:
 ```
 /path/to/Brainwash/                          (main_baselines.py, main_inv.py, main_brainwash.py)
 /path/to/PoisoningAttack/AccumulativeAttack/ (train_cifar.py, online_accu_train.py)
-/path/to/Multi-Level-MMD-Regularization/
-/path/to/Detect/ , /path/to/2nd/evasion/     (Neural Relation Graph, FGSM/PGD/PhysPatch)
+/path/to/Detect/                             (Neural Relation Graph)
 ```
 
 These projects, their datasets, and their model checkpoints (`.pkl`, hundreds of MB) are **not**
@@ -154,8 +144,6 @@ part of this repository. Before running the orchestration paths you must:
 1. Provide those attack projects locally, **and**
 2. Replace every `/path/to/...` (and adjust `CUDA_VISIBLE_DEVICES` / `LOG_DIR` / `BASE_DIR`) in
    `src/attack_spec.py` to match your machine.
-
-The `Analysis` paths (below) only need the step logs, so they can be run without re-executing attacks.
 
 ---
 
@@ -169,8 +157,6 @@ python Tracer_Agent.py
 #   Accumulative / accumulative_cifar100                                              (accumulative poisoning)
 #   Rethink / Rethink_pub                                                             (GNN label flipping)
 #   Detect                                                                            (label-error detection)
-#   MMD_backdoor / MMD_backdoor_cifar100 / FGSM / PGD / PhysPatch                      (additional builders)
-#   Analysis / Analysis_Accumulative   ← analyze existing logs only (no attack re-run)
 ```
 
 Each step writes a structured JSON report: identified attack, supporting evidence, risk level,
