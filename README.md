@@ -75,7 +75,7 @@ primary four-scenario evaluation.
 
 ```
 TRACER/
-├── assets/                  # README figures (e.g. tracer_workflow.png)
+├── assets/                  # README figures (e.g. figure_4.png)
 ├── src/
 │   ├── Tracer_Agent.py      # main entry point (interactive CLI)
 │   ├── attack_spec.py       # LOG_DIR + StepSpec + all build_*_specs() (attack pipeline definitions)
@@ -115,9 +115,8 @@ chroma run --host 127.0.0.1 --port 8000 --path ./chroma_db
 ### 4. Build the RAG knowledge base
 Source papers are **not** shipped in this repo (copyright). Download the PDFs listed in
 [`rag/ingest.py`](rag/ingest.py) — BrainWash (CVPR'24), Accumulative Poisoning (NeurIPS'21),
-Multi-Level MMD Regularization, Neural Relation Graph, Rethinking Label Poisoning for GNNs,
-"Explaining and Harnessing Adversarial Examples", PGD (Madry et al.), PhysPatch — place them under
-`./papers/`, then:
+Multi-Level MMD Regularization, Neural Relation Graph, and Rethinking Label Poisoning for GNNs —
+place them under `./papers/`, then:
 ```bash
 python rag/ingest.py       # extracts, chunks (1000-tok / 200 overlap), embeds → "papers" collection
 python rag/chromacheck.py  # sanity check

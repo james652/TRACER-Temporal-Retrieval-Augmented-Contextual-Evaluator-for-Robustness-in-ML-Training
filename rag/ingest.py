@@ -57,33 +57,6 @@ papers = [
             "year": 2024,
         },
     },
-    {
-        "id_prefix": "paper6",
-        "pdf_path": "./papers/EXPLAINING AND HARNESSING ADVERSARIAL EXAMPLES.pdf",
-        "metadata": {
-            "title": "Explaining and Harnessing Adversarial Examples",
-            "authors": "Ian J. Goodfellow; Jonathon Shlens; Christian Szegedy",
-            "year": 2014,
-        },
-    },
-    {
-        "id_prefix": "paper7",
-        "pdf_path": "./papers/Towards Deep Learning Models Resistant to Adversarial Attacks.pdf",
-        "metadata": {
-            "title": "Towards Deep Learning Models Resistant to Adversarial Attacks",
-            "authors": "Aleksander Madry; Aleksandar Makelov; Ludwig Schmidt; Dimitris Tsipras; Adrian Vladu",
-            "year": 2017,
-        },
-    },
-    {
-        "id_prefix": "paper8",
-        "pdf_path": "./papers/PhysPatch A Physically Realizable and Transferable Adversarial Patch Attack for Multimodal Large Language Models-based Autonomous Driving Systems.pdf",
-        "metadata": {
-            "title": "PhysPatch: A Physically Realizable and Transferable Adversarial Patch Attack for Multimodal Large Language Models-based Autonomous Driving Systems",
-            "authors": "Qi Guo; Xiaojun Jia; Shanmin Pang; Simeng Qin; Lin Wang; Ju Jia; Yang Liu; Qing Guo",
-            "year": 2026,
-        },
-    },
 ]
 
 def delete_existing_prefix(collection, id_prefix: str, batch_size: int = 500):
