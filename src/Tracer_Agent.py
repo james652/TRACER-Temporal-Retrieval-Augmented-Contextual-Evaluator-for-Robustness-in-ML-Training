@@ -15,7 +15,7 @@ Env:
   OPENAI_API_KEY (or OPENAI_APIKEY)
   USE_RAG=0/1      (default 1)
   USE_TOPK=0/1     (default 1)
-  TOPK_K=int       (default 10)
+  TOPK_K=int       (default 5)
   LOG_TAIL=int     (default 20000)
   RAGAS_EMBED_MODEL (default "text-embedding-3-small")
 """
@@ -648,7 +648,7 @@ class Analyzer:
 
         USE_RAG = os.getenv("USE_RAG", "1") == "1"
         USE_TOPK = os.getenv("USE_TOPK", "1") == "1"
-        TOPK_K = int(os.getenv("TOPK_K", "10"))
+        TOPK_K = int(os.getenv("TOPK_K", "5"))
         TRUNC = int(os.getenv("LOG_TAIL", "20000"))
 
         items: List[Dict[str, Any]] = []
@@ -885,7 +885,7 @@ def monitor_pipeline(
     TRUNC = int(os.getenv("LOG_TAIL", "20000"))
     USE_RAG = os.getenv("USE_RAG", "1") == "1"
     USE_TOPK = os.getenv("USE_TOPK", "1") == "1"
-    TOPK_K = int(os.getenv("TOPK_K", "10"))
+    TOPK_K = int(os.getenv("TOPK_K", "5"))
     USE_VISION = os.getenv("USE_VISION", "1") == "1"  
 
     print(f"[CFG] USE_RAG={USE_RAG}  USE_TOPK={USE_TOPK}  TOPK_K={TOPK_K}  USE_VISION={USE_VISION}")
