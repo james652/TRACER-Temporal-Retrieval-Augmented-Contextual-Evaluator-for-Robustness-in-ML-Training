@@ -45,7 +45,7 @@ temporal interpretation and evidence-grounded explanation on top of their numeri
 ## Threat scenarios & datasets
 
 The paper evaluates TRACER on four training-phase threat scenarios. The agent decides among
-**Brainwash / Accumulative Attack / Label Flipping / MMDRegularization / No Attack**, with a risk
+**Brainwash / Accumulative Attack / Label Flipping / No Attack**, with a risk
 level of 1–5.
 
 **Brainwash** (continual learning). *Selective forgetting: earlier tasks drop while the last task stays high.*
